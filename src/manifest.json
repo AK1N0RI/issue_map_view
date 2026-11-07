@@ -42,5 +42,11 @@
       "js": ["content.js"],
       "run_at": "document_idle"
     }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["lib/issue-map.js"],
+      "matches": ["https://github.com/*", "https://*.github.com/*"]
+    }
   ]
 }

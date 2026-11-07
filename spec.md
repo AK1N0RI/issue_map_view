@@ -5,6 +5,7 @@
 以下のうち、"* *"で記述されたものは、本機能を実装するための内部仕様です。
 
 
+## メニュー仕様
 * このアドオンを追加すると、FMEAを表現するためのエクセル状の表が作成されます。この表は、解析結果の列と、対策の列から構成されます。
 * 表は、githubのレポジトリviewの画面の"code", "issues"の横に、"issues map"としてメニューが表示され、これをクリックすることで呼び出されます。
 * Issues Mapメニューをクリックすると、repository navigationを残した独立した画面として表示されます。既存のリポジトリ画面の下には追加しません。
@@ -24,9 +25,20 @@
 * Issues MapメニューはGitHubのrepository navigation標準スタイルを継承し、独自の文字色・背景色・枠線を指定しません。通常時は背景を透過し、選択時はGitHub標準の選択状態で表示します。
 
 
+## Issue Map画面
+* エクセルに近い表形式で、解析結果の列と、対策の列が表示されます。
+* Githubのissue登録画面に近いデザインとして下さい。
+* 文字の大きさは、Githubのissue登録画面の2/3程度の文字サイズにして下さい。
+* 文字の色は、Githubのissue登録画面に近い色として下さい。
+* 表の色は、Githubのissue登録画面に近い色として下さい。
+* 先頭の行は、タイトルで、"Number", "Analysis Result", "Countermeasure"の列が表示されます。
+* 二行目は、Numberの列は空欄、Analysis Resultの列は次のセルに分解される。"Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", "Detection"の列が表示されます。Countermeasureの列は次のセルに分解される。"Content", "Effect(Effect)", "Effect(Occurrence)", "Effect(Detection)", "RPN", "Status", "Owner", "Deadline"の列が表示されます。
+* 三行目以降は、github issueの内容が表示されます。Numberの列は連番です。Analysis Resultの列は、github issueのタイトルとdescriptionに書かれたanalysis resultと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。Countermeasureの列は、github issueのタイトルとdescriptionに書かれたcountermeasureと書かれたheadingないに「*」で箇条書きされた内容と対策結果としてのPRの状況が各行に表示されます。
+
+### 解析結果
 * 解析結果の一つの要素はgithub issueの一つのissueです。analysis_resultというラベルをつけることで、解析結果の列に表示されます。
 * 対策の一つの要素もgithub issueの一つのissueです。countermeasureというラベルをつけることで、対策の列に表示されます。
-* 解析結果の列はさらにいくつかの列に分解されます。列は、Github issue番号、タイトルとdescriptionに書かれたanalysis resultと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。基本は、故障モード、故障原因、故障分類、防止策、検出方法、影響、重大度、発生度、検出度の列が表示されます。descriptionには以下のように書かれます。
+* 解析結果の列はさらにいくつかの列に分解されます。列は、Github issue番号、タイトルとdescriptionに書かれたanalysis resultと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。"Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", "Detection"の列が表示されます。descriptionには以下のように書かれます。
 
 ```
 ### analysis result
@@ -41,7 +53,9 @@
 * 検出度: 3
 ```
 
-* 対策の列は、Github issue番号、タイトルとdescriptionに書かれたcountermeasureと書かれたheadingないに「*」で箇条書きされた内容と対策結果としてのPRの状況が各行に表示されます。対策内容、対策効果(影響)、対策効果(発生)、対策効果(検出)、RPN、対策の実施状況、対策の担当者、対策の期限の列が表示されます。descriptionには以下のように書かれます。対策状況は対策に紐づけられたPRのマージ状況を確認し、マージ済みであれば「完了」、マージされていなければ「未完了」と表示されます。紐づけられたPRがない場合は「未着手」と表示されます。
+
+### 対策
+* 対策の列は、Github issue番号、タイトルとdescriptionに書かれたcountermeasureと書かれたheadingないに「*」で箇条書きされた内容と対策結果としてのPRの状況が各行に表示されます。"Content", "Effect(Effect)", "Effect(Occurrence)", "Effect(Detection)", "RPN", "Status", "Owner", "Deadline"の列が表示されます。descriptionには以下のように書かれます。対策状況は対策に紐づけられたPRのマージ状況を確認し、マージ済みであれば「完了」、マージされていなければ「未完了」と表示されます。紐づけられたPRがない場合は「未着手」と表示されます。
 
 ```
 ### countermeasure

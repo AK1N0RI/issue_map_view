@@ -23,13 +23,26 @@ function normalizeText(value) {
   return String(value ?? '').trim();
 }
 
-function parseBulletList(markdown) {
-  return (markdown || '')
-    .split(/\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith('* '))
-    .map((line) => line.replace(/^\*\s*/, ''))
-    .filter(Boolean);
+function parseBulletList(markdown, heading) {
+  const lines = (markdown || '').split(/\r?\n/);
+  const headingIndex = lines.findIndex((line) => (
+    new RegExp(`^#{1,6}\\s+${heading}\\s*$`, 'i').test(line.trim())
+  ));
+  if (headingIndex < 0) {
+    return [];
+  }
+
+  const section = [];
+  for (const line of lines.slice(headingIndex + 1)) {
+    if (/^#{1,6}\s/.test(line.trim())) {
+      break;
+    }
+    const trimmed = line.trim();
+    if (trimmed.startsWith('* ')) {
+      section.push(trimmed.replace(/^\*\s*/, ''));
+    }
+  }
+  return section.filter(Boolean);
 }
 
 function extractFieldValue(list, fieldLabel) {
@@ -40,8 +53,17 @@ function extractFieldValue(list, fieldLabel) {
   return normalizeText(matched.slice(fieldLabel.length + 1));
 }
 
+function extractNumberValue(list, fieldLabel) {
+  const value = extractFieldValue(list, fieldLabel);
+  if (!value) {
+    return '';
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : value;
+}
+
 function parseAnalysisResult(markdown) {
-  const list = parseBulletList(markdown);
+  const list = parseBulletList(markdown, 'analysis result');
 
   return {
     failureMode: extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.failureMode),
@@ -50,21 +72,23 @@ function parseAnalysisResult(markdown) {
     prevention: extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.prevention),
     detectionMethod: extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.detectionMethod),
     effect: extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.effect),
-    severity: Number(extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.severity) || 0),
-    occurrence: Number(extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.occurrence) || 0),
-    detection: Number(extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.detection) || 0),
+    severity: extractNumberValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.severity),
+    occurrence: extractNumberValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.occurrence),
+    detection: extractNumberValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.detection),
   };
 }
 
 function parseCountermeasure(markdown) {
-  const list = parseBulletList(markdown);
+  const list = parseBulletList(markdown, 'countermeasure');
 
   return {
     content: extractFieldValue(list, ISSUE_FIELDS.COUNTERMEASURE.content),
     effectImpact: extractFieldValue(list, ISSUE_FIELDS.COUNTERMEASURE.effectImpact),
-    effectOccurrence: Number(extractFieldValue(list, ISSUE_FIELDS.COUNTERMEASURE.effectOccurrence) || 0),
-    effectDetection: Number(extractFieldValue(list, ISSUE_FIELDS.COUNTERMEASURE.effectDetection) || 0),
-    rpn: Number(extractFieldValue(list, ISSUE_FIELDS.COUNTERMEASURE.rpn) || 0),
+    effectOccurrence: extractNumberValue(list, ISSUE_FIELDS.COUNTERMEASURE.effectOccurrence),
+    effectDetection: extractNumberValue(list, ISSUE_FIELDS.COUNTERMEASURE.effectDetection),
+    rpn: extractNumberValue(list, ISSUE_FIELDS.COUNTERMEASURE.rpn),
+    owner: extractFieldValue(list, 'Owner'),
+    deadline: extractFieldValue(list, 'Deadline'),
   };
 }
 
