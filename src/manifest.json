@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Issue Map View",
+  "version": "1.0.0",
+  "description": "GitHub issue-based FMEA and countermeasure visualization tool.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://github.com/*",
+    "https://*.github.com/*"
+  ],
+  "action": {
+    "default_title": "Issues Map",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.svg",
+      "32": "icon.svg",
+      "48": "icon.svg",
+      "128": "icon.svg"
+    }
+  },
+  "icons": {
+    "16": "icon.svg",
+    "32": "icon.svg",
+    "48": "icon.svg",
+    "128": "icon.svg"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://github.com/*",
+        "https://github.com/*/*",
+        "https://*.github.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
