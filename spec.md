@@ -34,6 +34,7 @@
 * 先頭の行は、タイトルで、"Number", "Analysis Result", "Countermeasure"の列が表示されます。
 * 二行目は、Numberの列は空欄、Analysis Resultの列は次のセルに分解される。"Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", "Detection"の列が表示されます。Countermeasureの列は次のセルに分解される。"Content", "Effect(Effect)", "Effect(Occurrence)", "Effect(Detection)", "RPN", "Status", "Owner", "Deadline"の列が表示されます。
 * 三行目以降は、github issueの内容が表示されます。Numberの列は連番です。Analysis Resultの列は、github issueのタイトルとdescriptionに書かれたanalysis resultと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。Countermeasureの列は、github issueのタイトルとdescriptionに書かれたcountermeasureと書かれたheadingないに「*」で箇条書きされた内容と対策結果としてのPRの状況が各行に表示されます。
+* Issueが存在する行のNumber列にはIssueごとの「表示」ボタンを表示します。ボタンをクリックすると、該当するGitHub Issueの詳細画面を新しいタブで開きます。
 
 ### 解析結果
 * 解析結果の一つの要素はgithub issueの一つのissueです。analysis_resultというラベルをつけることで、解析結果の列に表示されます。
@@ -68,6 +69,47 @@
 
 * はじめ機能した際は、解析結果の列と、対策の列の両方が表示されており、それぞれブランクです。解析結果の列、対策の列の中にはブランクのボックスが表示されます。
 * ブランクのボックスには新規作成と、リンクの二つのボタンがあります。
+* Issueが一つも登録されていない場合は、画面上部にも解析結果と対策それぞれの「新規作成」ボタンを表示します。
+* Issue一覧の取得に失敗した場合も、エラー表示とあわせて上部に新規作成ボタンを表示します。
 * 新規作成をクリックすると、githubの新規issue作成画面に遷移します。新規issue作成画面では、解析結果の列の場合は、analysis_resultというラベルがついたissueが作成されます。対策の列の場合は、countermeasureというラベルがついたissueが作成されます。
 * リンクをクリックすると、githubのissue一覧画面に遷移します。解析結果の列の場合は、analysis_resultというラベルがついたGithub issueの一覧が表示されます。対策の列の場合は、countermeasureというラベルがついたGithub issueの一覧が表示されます。
 
+
+### 解析結果issueの作成
+* 解析結果の列の新規作成ボタンをクリックすると、githubの新規issue作成画面に遷移します。
+* 新規issue作成画面では、analysis_resultというラベルが設定された状態となります。
+* 新規issue作成画面では、タイトルとdescriptionに書かれたanalysis resultと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。
+* 「*」の箇条書きの内容は、以下のようにデフォルト入力されます。
+
+```
+### analysis result
+<!-- do not edit predefined fields -->
+* Failure Mode: <!-- insert failure mode -->
+* Failure Cause: <!-- insert failure cause -->
+* Failure Classification: <!-- insert failure classification -->
+* Preventive Measure: <!-- insert preventive measure -->
+* Detection Method: <!-- insert detection method -->
+* Effect: <!-- insert effect -->
+* Severity: <!-- insert severity -->
+* Occurrence: <!-- insert occurrence -->
+* Detection: <!-- insert detection -->
+```
+
+### 対策issueの作成
+* 対策の列の新規作成ボタンをクリックすると、githubの新規issue作成画面に遷移します。
+* 新規issue作成画面では、countermeasureというラベルが設定された状態となります。
+* 新規issue作成画面では、タイトルとdescriptionに書かれたcountermeasureと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。
+* 「*」の箇条書きの内容は、以下のようにデフォルト入力されます。 
+
+```
+### countermeasure
+<!-- do not edit predefined fields -->
+* Content: <!-- insert countermeasure content -->
+* Effect(Effect): <!-- insert countermeasure effect on effect --> 
+* Effect(Occurrence): <!-- insert countermeasure effect on occurrence -->
+* Effect(Detection): <!-- insert countermeasure effect on detection -->
+* RPN: <!-- insert countermeasure RPN -->
+* Status: <!-- insert countermeasure status -->
+* Owner: <!-- insert countermeasure owner -->
+* Deadline: <!-- insert countermeasure deadline -->
+``` 

@@ -51,6 +51,34 @@ test('parseAnalysisResult ignores bullets outside its section and leaves missing
   assert.equal(result.severity, '');
 });
 
+test('parseAnalysisResult reads the English fields from the creation template', () => {
+  const result = parseAnalysisResult(`
+### analysis result
+<!-- do not edit predefined fields -->
+* Failure Mode: motor does not start
+* Failure Cause: worn bearing
+* Failure Classification: mechanical
+* Preventive Measure: replace bearing
+* Detection Method: monthly inspection
+* Effect: production stops
+* Severity: 9
+* Occurrence: 7
+* Detection: 3
+`);
+
+  assert.deepEqual(result, {
+    failureMode: 'motor does not start',
+    failureCause: 'worn bearing',
+    failureCategory: 'mechanical',
+    prevention: 'replace bearing',
+    detectionMethod: 'monthly inspection',
+    effect: 'production stops',
+    severity: 9,
+    occurrence: 7,
+    detection: 3,
+  });
+});
+
 test('parseCountermeasure extracts measure data from markdown', () => {
   const markdown = `
 ### countermeasure
@@ -74,6 +102,31 @@ test('parseCountermeasure extracts measure data from markdown', () => {
   assert.equal(result.deadline, '2026-12-31');
 });
 
+test('parseCountermeasure reads the English fields from the creation template', () => {
+  const result = parseCountermeasure(`
+### countermeasure
+<!-- do not edit predefined fields -->
+* Content: replace the bearing regularly
+* Effect(Effect): production continues
+* Effect(Occurrence): 2
+* Effect(Detection): 1
+* RPN: 18
+* Status: <!-- insert countermeasure status -->
+* Owner: <!-- insert countermeasure owner -->
+* Deadline: <!-- insert countermeasure deadline -->
+`);
+
+  assert.deepEqual(result, {
+    content: 'replace the bearing regularly',
+    effectImpact: 'production continues',
+    effectOccurrence: 2,
+    effectDetection: 1,
+    rpn: 18,
+    owner: '',
+    deadline: '',
+  });
+});
+
 test('buildIssueCreateUrl adds the analysis_result label for issue creation', () => {
   const url = buildIssueCreateUrl({
     owner: 'octo-org',
@@ -81,10 +134,41 @@ test('buildIssueCreateUrl adds the analysis_result label for issue creation', ()
     type: 'analysis_result',
   });
 
-  assert.equal(
-    url,
-    'https://github.com/octo-org/demo-repo/issues/new?labels=analysis_result'
-  );
+  const parsedUrl = new URL(url);
+  assert.equal(parsedUrl.origin + parsedUrl.pathname, 'https://github.com/octo-org/demo-repo/issues/new');
+  assert.equal(parsedUrl.searchParams.get('labels'), 'analysis_result');
+  assert.equal(parsedUrl.searchParams.get('body'), `### analysis result
+<!-- do not edit predefined fields -->
+* Failure Mode: <!-- insert failure mode -->
+* Failure Cause: <!-- insert failure cause -->
+* Failure Classification: <!-- insert failure classification -->
+* Preventive Measure: <!-- insert preventive measure -->
+* Detection Method: <!-- insert detection method -->
+* Effect: <!-- insert effect -->
+* Severity: <!-- insert severity -->
+* Occurrence: <!-- insert occurrence -->
+* Detection: <!-- insert detection -->`);
+});
+
+test('buildIssueCreateUrl adds the countermeasure template and label', () => {
+  const url = new URL(buildIssueCreateUrl({
+    owner: 'octo-org',
+    repo: 'demo-repo',
+    type: 'countermeasure',
+  }));
+
+  assert.equal(url.origin + url.pathname, 'https://github.com/octo-org/demo-repo/issues/new');
+  assert.equal(url.searchParams.get('labels'), 'countermeasure');
+  assert.equal(url.searchParams.get('body'), `### countermeasure
+<!-- do not edit predefined fields -->
+* Content: <!-- insert countermeasure content -->
+* Effect(Effect): <!-- insert countermeasure effect on effect -->
+* Effect(Occurrence): <!-- insert countermeasure effect on occurrence -->
+* Effect(Detection): <!-- insert countermeasure effect on detection -->
+* RPN: <!-- insert countermeasure RPN -->
+* Status: <!-- insert countermeasure status -->
+* Owner: <!-- insert countermeasure owner -->
+* Deadline: <!-- insert countermeasure deadline -->`);
 });
 
 test('buildIssueListUrl filters the repository issues by label', () => {

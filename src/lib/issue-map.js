@@ -19,8 +19,32 @@ const ISSUE_FIELDS = {
   },
 };
 
+const ISSUE_CREATE_BODIES = {
+  analysis_result: `### analysis result
+<!-- do not edit predefined fields -->
+* Failure Mode: <!-- insert failure mode -->
+* Failure Cause: <!-- insert failure cause -->
+* Failure Classification: <!-- insert failure classification -->
+* Preventive Measure: <!-- insert preventive measure -->
+* Detection Method: <!-- insert detection method -->
+* Effect: <!-- insert effect -->
+* Severity: <!-- insert severity -->
+* Occurrence: <!-- insert occurrence -->
+* Detection: <!-- insert detection -->`,
+  countermeasure: `### countermeasure
+<!-- do not edit predefined fields -->
+* Content: <!-- insert countermeasure content -->
+* Effect(Effect): <!-- insert countermeasure effect on effect -->
+* Effect(Occurrence): <!-- insert countermeasure effect on occurrence -->
+* Effect(Detection): <!-- insert countermeasure effect on detection -->
+* RPN: <!-- insert countermeasure RPN -->
+* Status: <!-- insert countermeasure status -->
+* Owner: <!-- insert countermeasure owner -->
+* Deadline: <!-- insert countermeasure deadline -->`,
+};
+
 function normalizeText(value) {
-  return String(value ?? '').trim();
+  return String(value ?? '').replace(/<!--.*?-->/g, '').trim();
 }
 
 function parseBulletList(markdown, heading) {
@@ -46,11 +70,13 @@ function parseBulletList(markdown, heading) {
 }
 
 function extractFieldValue(list, fieldLabel) {
-  const matched = list.find((line) => line.startsWith(`${fieldLabel}:`));
+  const labels = Array.isArray(fieldLabel) ? fieldLabel : [fieldLabel];
+  const matched = list.find((line) => labels.some((label) => line.startsWith(`${label}:`)));
   if (!matched) {
     return '';
   }
-  return normalizeText(matched.slice(fieldLabel.length + 1));
+  const matchedLabel = labels.find((label) => matched.startsWith(`${label}:`));
+  return normalizeText(matched.slice(matchedLabel.length + 1));
 }
 
 function extractNumberValue(list, fieldLabel) {
@@ -66,15 +92,15 @@ function parseAnalysisResult(markdown) {
   const list = parseBulletList(markdown, 'analysis result');
 
   return {
-    failureMode: extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.failureMode),
-    failureCause: extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.failureCause),
-    failureCategory: extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.failureCategory),
-    prevention: extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.prevention),
-    detectionMethod: extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.detectionMethod),
-    effect: extractFieldValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.effect),
-    severity: extractNumberValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.severity),
-    occurrence: extractNumberValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.occurrence),
-    detection: extractNumberValue(list, ISSUE_FIELDS.ANALYSIS_RESULT.detection),
+    failureMode: extractFieldValue(list, ['Failure Mode', ISSUE_FIELDS.ANALYSIS_RESULT.failureMode]),
+    failureCause: extractFieldValue(list, ['Failure Cause', ISSUE_FIELDS.ANALYSIS_RESULT.failureCause]),
+    failureCategory: extractFieldValue(list, ['Failure Classification', ISSUE_FIELDS.ANALYSIS_RESULT.failureCategory]),
+    prevention: extractFieldValue(list, ['Preventive Measure', ISSUE_FIELDS.ANALYSIS_RESULT.prevention]),
+    detectionMethod: extractFieldValue(list, ['Detection Method', ISSUE_FIELDS.ANALYSIS_RESULT.detectionMethod]),
+    effect: extractFieldValue(list, ['Effect', ISSUE_FIELDS.ANALYSIS_RESULT.effect]),
+    severity: extractNumberValue(list, ['Severity', ISSUE_FIELDS.ANALYSIS_RESULT.severity]),
+    occurrence: extractNumberValue(list, ['Occurrence', ISSUE_FIELDS.ANALYSIS_RESULT.occurrence]),
+    detection: extractNumberValue(list, ['Detection', ISSUE_FIELDS.ANALYSIS_RESULT.detection]),
   };
 }
 
@@ -82,10 +108,10 @@ function parseCountermeasure(markdown) {
   const list = parseBulletList(markdown, 'countermeasure');
 
   return {
-    content: extractFieldValue(list, ISSUE_FIELDS.COUNTERMEASURE.content),
-    effectImpact: extractFieldValue(list, ISSUE_FIELDS.COUNTERMEASURE.effectImpact),
-    effectOccurrence: extractNumberValue(list, ISSUE_FIELDS.COUNTERMEASURE.effectOccurrence),
-    effectDetection: extractNumberValue(list, ISSUE_FIELDS.COUNTERMEASURE.effectDetection),
+    content: extractFieldValue(list, ['Content', ISSUE_FIELDS.COUNTERMEASURE.content]),
+    effectImpact: extractFieldValue(list, ['Effect(Effect)', ISSUE_FIELDS.COUNTERMEASURE.effectImpact]),
+    effectOccurrence: extractNumberValue(list, ['Effect(Occurrence)', ISSUE_FIELDS.COUNTERMEASURE.effectOccurrence]),
+    effectDetection: extractNumberValue(list, ['Effect(Detection)', ISSUE_FIELDS.COUNTERMEASURE.effectDetection]),
     rpn: extractNumberValue(list, ISSUE_FIELDS.COUNTERMEASURE.rpn),
     owner: extractFieldValue(list, 'Owner'),
     deadline: extractFieldValue(list, 'Deadline'),
@@ -96,6 +122,7 @@ function buildIssueCreateUrl({ owner, repo, type }) {
   const label = type === 'countermeasure' ? 'countermeasure' : 'analysis_result';
   const url = new URL(`https://github.com/${owner}/${repo}/issues/new`);
   url.searchParams.set('labels', label);
+  url.searchParams.set('body', ISSUE_CREATE_BODIES[label]);
   return url.toString();
 }
 

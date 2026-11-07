@@ -244,7 +244,9 @@ function createIssueMapPage() {
   const statusMessage = document.createElement('span');
   statusMessage.setAttribute('role', 'status');
   statusMessage.style.cssText = 'color: var(--fgColor-muted, #656d76); font-size: 9.33px;';
-  toolbar.append(refreshButton, statusMessage);
+  const emptyCreateActions = document.createElement('div');
+  emptyCreateActions.style.cssText = 'display: none; gap: 8px; margin-left: auto;';
+  toolbar.append(refreshButton, statusMessage, emptyCreateActions);
 
   const tableWrapper = document.createElement('div');
   tableWrapper.style.cssText = 'overflow-x: auto; border: 1px solid var(--borderColor-default, #d1d9e0); border-radius: 6px; background-color: var(--bgColor-default, #fff);';
@@ -325,6 +327,22 @@ function createIssueMapPage() {
     body.replaceChildren(row);
   };
 
+  const showEmptyCreateActions = (utilities) => {
+    emptyCreateActions.replaceChildren();
+    for (const [label, type] of [
+      ['解析結果を新規作成', ISSUE_MAP_TYPES.ANALYSIS_RESULT],
+      ['対策を新規作成', ISSUE_MAP_TYPES.COUNTERMEASURE],
+    ]) {
+      const button = document.createElement('a');
+      button.textContent = label;
+      button.className = 'btn btn-primary btn-sm';
+      button.href = utilities.buildIssueCreateUrl({ ...repoContext, type });
+      button.style.fontSize = '9.33px';
+      emptyCreateActions.appendChild(button);
+    }
+    emptyCreateActions.style.display = 'flex';
+  };
+
   const createEmptyCategoryCell = (type, message, utilities) => {
     const cell = document.createElement('td');
     cell.style.cssText = 'padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); vertical-align: top;';
@@ -357,13 +375,19 @@ function createIssueMapPage() {
         if (!issue) {
           continue;
         }
-        const link = document.createElement('a');
-        link.href = issue.html_url;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.textContent = ` #${issue.number}: ${issue.title}`;
-        link.title = issue.title;
-        numberCell.appendChild(link);
+        const issueReference = document.createElement('div');
+        issueReference.textContent = `#${issue.number}: ${issue.title} `;
+        const showButton = document.createElement('a');
+        showButton.href = issue.html_url;
+        showButton.target = '_blank';
+        showButton.rel = 'noopener noreferrer';
+        showButton.textContent = '表示';
+        showButton.title = `${issue.title} (#${issue.number}) を表示`;
+        showButton.setAttribute('aria-label', showButton.title);
+        showButton.className = 'btn btn-sm';
+        showButton.style.fontSize = '9.33px';
+        issueReference.appendChild(showButton);
+        numberCell.appendChild(issueReference);
       }
       row.appendChild(numberCell);
 
@@ -418,10 +442,11 @@ function createIssueMapPage() {
       return;
     }
     wrapper.loading = true;
+    let utilities;
     statusMessage.textContent = '読み込み中...';
     refreshButton.disabled = true;
     try {
-      const utilities = await issueMapUtilities;
+      utilities = await issueMapUtilities;
       const [rawAnalysisIssues, rawCountermeasureIssues] = await Promise.all([
         fetchLabeledIssues(repoContext, ISSUE_MAP_TYPES.ANALYSIS_RESULT),
         fetchLabeledIssues(repoContext, ISSUE_MAP_TYPES.COUNTERMEASURE),
@@ -440,11 +465,16 @@ function createIssueMapPage() {
       );
       if (analysisIssues.length === 0 && countermeasureIssues.length === 0) {
         await renderEmptyState(utilities);
+        showEmptyCreateActions(utilities);
       } else {
+        emptyCreateActions.style.display = 'none';
         renderIssues(analysisIssues, countermeasureIssues, utilities);
       }
       statusMessage.textContent = `${analysisIssues.length} 件の解析結果、${countermeasureIssues.length} 件の対策`;
     } catch (error) {
+      if (utilities) {
+        showEmptyCreateActions(utilities);
+      }
       statusMessage.textContent = `読み込みに失敗しました: ${error.message}`;
       const errorRow = document.createElement('tr');
       const errorCell = document.createElement('td');
