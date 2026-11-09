@@ -1,8 +1,38 @@
 async function updatePatStatus() {
-  const { githubPat } = await chrome.storage.session.get('githubPat');
-  document.getElementById('pat-status').textContent = githubPat
-    ? 'PATをブラウザー／拡張機能のセッション中のみ保存しています。'
-    : 'PATは未設定です。';
+  const status = document.getElementById('pat-status');
+  status.textContent = 'PATの設定状態を確認中...';
+  try {
+    const result = await chrome.runtime.sendMessage({ type: 'CHECK_GITHUB_PAT' });
+    if (!result?.ok) {
+      throw new Error(result?.error || 'PATの状態を確認できませんでした');
+    }
+    if (!result.configured) {
+      status.textContent = 'PATは未設定です。';
+      return;
+    }
+    if (!result.valid) {
+      status.textContent = result.expired
+        ? 'PATは設定済みですが、期限切れまたは無効です。新しいPATを設定してください。'
+        : `PATは設定済みですが、有効性を確認できませんでした: ${result.error}`;
+      return;
+    }
+
+    const expiration = result.expiration
+      ? new Date(result.expiration)
+      : null;
+    if (expiration && !Number.isNaN(expiration.getTime()) && expiration <= new Date()) {
+      status.textContent = `PATは設定済みですが、${expiration.toLocaleString('ja-JP')} に期限切れです。`;
+      return;
+    }
+
+    const account = result.username ? `（${result.username}）` : '';
+    const expiryText = expiration && !Number.isNaN(expiration.getTime())
+      ? `有効期限: ${expiration.toLocaleString('ja-JP')}`
+      : '有効期限情報を取得できませんでした。';
+    status.textContent = `PATは設定済み・有効です${account}。${expiryText}`;
+  } catch (error) {
+    status.textContent = `PATの状態を確認できませんでした: ${error.message}`;
+  }
 }
 
 document.getElementById('save-github-pat').addEventListener('click', async () => {
@@ -16,7 +46,7 @@ document.getElementById('save-github-pat').addEventListener('click', async () =>
   try {
     await chrome.storage.session.set({ githubPat });
     input.value = '';
-    status.textContent = 'PATをブラウザー／拡張機能のセッション中のみ保存しました。';
+    await updatePatStatus();
   } catch (error) {
     status.textContent = `PATを保存できませんでした: ${error.message}`;
   }
@@ -27,7 +57,7 @@ document.getElementById('clear-github-pat').addEventListener('click', async () =
   try {
     await chrome.storage.session.remove('githubPat');
     document.getElementById('github-pat').value = '';
-    status.textContent = 'PATを削除しました。';
+    await updatePatStatus();
   } catch (error) {
     status.textContent = `PATを削除できませんでした: ${error.message}`;
   }

@@ -295,89 +295,15 @@ function getRepoNavInsertionTarget(nav) {
   return pullsLink ? getRepoNavDirectChild(nav, pullsLink) : null;
 }
 
-async function fetchGitHubJson(url) {
-  const response = await fetch(url, {
-    credentials: 'include',
-    headers: {
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
+async function fetchIssueMapData(repoContext) {
+  const result = await chrome.runtime.sendMessage({
+    type: 'FETCH_ISSUE_MAP_DATA',
+    ...repoContext,
   });
-  if (!response.ok) {
-    throw new Error(`GitHub API error (${response.status})`);
+  if (!result?.ok) {
+    throw new Error(result?.error || 'Issue一覧を取得できませんでした');
   }
-  return response.json();
-}
-
-async function fetchLabeledIssues({ owner, repo }, label) {
-  const issues = [];
-  for (let page = 1; ; page += 1) {
-    const url = new URL(
-      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`
-    );
-    url.searchParams.set('labels', label);
-    url.searchParams.set('state', 'all');
-    url.searchParams.set('sort', 'created');
-    url.searchParams.set('direction', 'asc');
-    url.searchParams.set('per_page', '100');
-    url.searchParams.set('page', String(page));
-
-    const pageIssues = await fetchGitHubJson(url);
-    if (!Array.isArray(pageIssues)) {
-      throw new Error('GitHub API returned an invalid issue list');
-    }
-    issues.push(...pageIssues.filter((issue) => !issue.pull_request));
-    if (pageIssues.length < 100) {
-      return issues;
-    }
-  }
-}
-
-async function getLinkedPullRequest(issue, owner, repo) {
-  const timelineUrl = new URL(
-    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issue.number}/timeline`
-  );
-  timelineUrl.searchParams.set('per_page', '100');
-  const events = await fetchGitHubJson(timelineUrl);
-  if (!Array.isArray(events)) {
-    throw new Error(`GitHub API returned an invalid timeline for issue #${issue.number}`);
-  }
-
-  const linkedPullRequests = events
-    .filter((event) => event.event === 'cross-referenced')
-    .map((event) => event.source?.issue || event.source)
-    .filter((source) => source?.pull_request?.url);
-
-  if (linkedPullRequests.length === 0) {
-    return { ...issue, countermeasureStatus: '未着手' };
-  }
-
-  const pullRequests = await Promise.all(
-    linkedPullRequests.map((source) => fetchGitHubJson(source.pull_request.url))
-  );
-  return {
-    ...issue,
-    countermeasureStatus: pullRequests.some((pullRequest) => pullRequest.merged_at)
-      ? '完了'
-      : '未完了',
-  };
-}
-
-async function mapWithConcurrency(items, concurrency, mapper) {
-  const results = new Array(items.length);
-  let nextIndex = 0;
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    async () => {
-      while (nextIndex < items.length) {
-        const index = nextIndex;
-        nextIndex += 1;
-        results[index] = await mapper(items[index]);
-      }
-    }
-  );
-  await Promise.all(workers);
-  return results;
+  return result;
 }
 
 function createIssueMapPage() {
@@ -623,22 +549,16 @@ function createIssueMapPage() {
     refreshButton.disabled = true;
     try {
       utilities = await issueMapUtilities;
-      const [rawAnalysisIssues, rawCountermeasureIssues] = await Promise.all([
-        fetchLabeledIssues(repoContext, ISSUE_MAP_TYPES.ANALYSIS_RESULT),
-        fetchLabeledIssues(repoContext, ISSUE_MAP_TYPES.COUNTERMEASURE),
-      ]);
+      const { analysisIssues: rawAnalysisIssues, countermeasureIssues: rawCountermeasureIssues } =
+        await fetchIssueMapData(repoContext);
       const analysisIssues = rawAnalysisIssues.map((issue) => ({
         ...issue,
         parsed: utilities.parseAnalysisResult(issue.body || ''),
       }));
-      const countermeasureIssues = await mapWithConcurrency(
-        rawCountermeasureIssues,
-        4,
-        async (issue) => ({
-          ...await getLinkedPullRequest(issue, repoContext.owner, repoContext.repo),
-          parsed: utilities.parseCountermeasure(issue.body || ''),
-        })
-      );
+      const countermeasureIssues = rawCountermeasureIssues.map((issue) => ({
+        ...issue,
+        parsed: utilities.parseCountermeasure(issue.body || ''),
+      }));
       if (analysisIssues.length === 0 && countermeasureIssues.length === 0) {
         await renderEmptyState(utilities);
         showEmptyCreateActions(utilities);
