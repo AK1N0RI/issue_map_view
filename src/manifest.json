@@ -11,7 +11,8 @@
   ],
   "host_permissions": [
     "https://github.com/*",
-    "https://*.github.com/*"
+    "https://*.github.com/*",
+    "https://api.github.com/*"
   ],
   "action": {
     "default_title": "Issues Map",
@@ -23,6 +24,10 @@
       "128": "icon.svg"
     }
   },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "icons": {
     "16": "icon.svg",
     "32": "icon.svg",
@@ -30,7 +35,8 @@
     "128": "icon.svg"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {

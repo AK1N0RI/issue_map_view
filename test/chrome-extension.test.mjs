@@ -5,6 +5,7 @@ import {
   parseAnalysisResult,
   parseCountermeasure,
   buildIssueCreateUrl,
+  buildIssueCreateApiRequest,
   buildIssueListUrl,
   deriveCountermeasureStatus,
 } from '../src/lib/issue-map.js';
@@ -169,6 +170,50 @@ test('buildIssueCreateUrl adds the countermeasure template and label', () => {
 * Status: <!-- insert countermeasure status -->
 * Owner: <!-- insert countermeasure owner -->
 * Deadline: <!-- insert countermeasure deadline -->`);
+});
+
+test('buildIssueCreateUrl includes a supplied title and body', () => {
+const url = new URL(buildIssueCreateUrl({
+  owner: 'octo-org',
+  repo: 'demo-repo',
+  type: 'analysis_result',
+  title: 'Motor failure',
+  body: '### analysis result\n* Failure Mode: Motor does not start',
+}));
+
+assert.equal(url.searchParams.get('labels'), 'analysis_result');
+assert.equal(url.searchParams.get('title'), 'Motor failure');
+assert.equal(url.searchParams.get('body'), '### analysis result\n* Failure Mode: Motor does not start');
+});
+
+test('buildIssueCreateApiRequest sends analysis results to the GitHub Issues API', () => {
+  assert.deepEqual(buildIssueCreateApiRequest({
+    owner: 'octo-org',
+    repo: 'demo-repo',
+    type: 'analysis_result',
+    title: '  Motor failure  ',
+    body: '### analysis result',
+  }), {
+    url: 'https://api.github.com/repos/octo-org/demo-repo/issues',
+    method: 'POST',
+    payload: {
+      title: 'Motor failure',
+      body: '### analysis result',
+      labels: ['analysis_result'],
+    },
+  });
+});
+
+test('buildIssueCreateApiRequest applies the countermeasure label', () => {
+  const request = buildIssueCreateApiRequest({
+    owner: 'octo-org',
+    repo: 'demo-repo',
+    type: 'countermeasure',
+    title: 'Replace bearing',
+    body: '### countermeasure',
+  });
+
+  assert.deepEqual(request.payload.labels, ['countermeasure']);
 });
 
 test('buildIssueListUrl filters the repository issues by label', () => {

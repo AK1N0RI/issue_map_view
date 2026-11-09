@@ -39,6 +39,7 @@
 ### 解析結果
 * 解析結果の一つの要素はgithub issueの一つのissueです。analysis_resultというラベルをつけることで、解析結果の列に表示されます。
 * 対策の一つの要素もgithub issueの一つのissueです。countermeasureというラベルをつけることで、対策の列に表示されます。
+* Issue作成を利用する前に、リポジトリにanalysis_resultとcountermeasureのラベルを作成しておく必要があります。
 * 解析結果の列はさらにいくつかの列に分解されます。列は、Github issue番号、タイトルとdescriptionに書かれたanalysis resultと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。"Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", "Detection"の列が表示されます。descriptionには以下のように書かれます。
 
 ```
@@ -71,12 +72,12 @@
 * ブランクのボックスには新規作成と、リンクの二つのボタンがあります。
 * Issueが一つも登録されていない場合は、画面上部にも解析結果と対策それぞれの「新規作成」ボタンを表示します。
 * Issue一覧の取得に失敗した場合も、エラー表示とあわせて上部に新規作成ボタンを表示します。
-* 新規作成をクリックすると、githubの新規issue作成画面に遷移します。新規issue作成画面では、解析結果の列の場合は、analysis_resultというラベルがついたissueが作成されます。対策の列の場合は、countermeasureというラベルがついたissueが作成されます。
+* 新規作成をクリックすると、ドロワーにIssue作成フォームを表示します。タイトルと本文を編集し、GitHub REST API経由でIssueを作成します。解析結果の列の場合はanalysis_result、対策の列の場合はcountermeasureというラベルがついたissueが作成されます。作成後は画面遷移せずに完了表示を行います。API認証には、対象リポジトリのIssues: Read and write権限を持つFine-grained PATを使用し、ブラウザーセッション中のみ保存します。
 * リンクをクリックすると、githubのissue一覧画面に遷移します。解析結果の列の場合は、analysis_resultというラベルがついたGithub issueの一覧が表示されます。対策の列の場合は、countermeasureというラベルがついたGithub issueの一覧が表示されます。
 
 
 ### 解析結果issueの作成
-* 解析結果の列の新規作成ボタンをクリックすると、githubの新規issue作成画面に遷移します。
+* 解析結果の列の新規作成ボタンをクリックすると、ドロワーにgithubの新規issue作成画面を表示します。
 * 新規issue作成画面では、analysis_resultというラベルが設定された状態となります。
 * 新規issue作成画面では、タイトルとdescriptionに書かれたanalysis resultと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。
 * 「*」の箇条書きの内容は、以下のようにデフォルト入力されます。
@@ -96,7 +97,7 @@
 ```
 
 ### 対策issueの作成
-* 対策の列の新規作成ボタンをクリックすると、githubの新規issue作成画面に遷移します。
+* 対策の列の新規作成ボタンをクリックすると、ドロワーにgithubの新規issue作成画面を表示します。
 * 新規issue作成画面では、countermeasureというラベルが設定された状態となります。
 * 新規issue作成画面では、タイトルとdescriptionに書かれたcountermeasureと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。
 * 「*」の箇条書きの内容は、以下のようにデフォルト入力されます。 

@@ -14,6 +14,7 @@ const ISSUE_MAP_MENU_SVG = `
 `;
 
 let issueMapPageState = null;
+let activeIssueCreateDrawer = null;
 
 function getRepositoryContext() {
   const match = window.location.pathname.match(/^\/([^/]+)\/([^/]+)(?:\/.*)?$/);
@@ -39,6 +40,167 @@ function buildIssueListUrl({ owner, repo, type }) {
   const url = new URL(`https://github.com/${owner}/${repo}/issues`);
   url.searchParams.set('q', `label:"${label}"`);
   return url.toString();
+}
+
+function closeIssueCreateDrawer() {
+  if (!activeIssueCreateDrawer) {
+    return;
+  }
+
+  const { backdrop, previousOverflow, returnFocus } = activeIssueCreateDrawer;
+  backdrop.remove();
+  document.body.style.overflow = previousOverflow;
+  activeIssueCreateDrawer = null;
+  if (returnFocus instanceof HTMLElement && returnFocus.isConnected) {
+    returnFocus.focus();
+  }
+}
+
+async function submitIssueCreateForm(form, repoContext, type, content, submitButton, statusMessage) {
+  const formData = new FormData(form);
+  const title = String(formData.get('title') || '').trim();
+  const body = String(formData.get('body') || '');
+  if (!title) {
+    form.querySelector('[name="title"]')?.focus();
+    return;
+  }
+
+  submitButton.disabled = true;
+  submitButton.textContent = '作成中...';
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'CREATE_GITHUB_ISSUE',
+      owner: repoContext.owner,
+      repo: repoContext.repo,
+      issueType: type,
+      title,
+      body,
+    });
+    if (!response?.ok) {
+      throw new Error(response?.error || 'GitHub APIでIssueを作成できませんでした');
+    }
+
+    const successMessage = document.createElement('p');
+    successMessage.textContent = 'Issueを作成しました。';
+    successMessage.setAttribute('role', 'status');
+    const issueLink = document.createElement('a');
+    issueLink.href = response.issueUrl;
+    issueLink.textContent = '作成したIssueを表示';
+    issueLink.target = '_blank';
+    issueLink.rel = 'noopener noreferrer';
+    content.replaceChildren(successMessage, issueLink);
+  } catch (error) {
+    statusMessage.textContent = `Issueを作成できませんでした: ${error.message}`;
+    submitButton.disabled = false;
+    submitButton.textContent = 'Issueを作成';
+  }
+}
+
+function renderIssueCreateForm(content, utilities, repoContext, type) {
+  const form = document.createElement('form');
+  form.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+  const titleLabel = document.createElement('label');
+  titleLabel.textContent = 'タイトル';
+  titleLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.name = 'title';
+  titleInput.required = true;
+  titleInput.maxLength = 256;
+  titleInput.className = 'form-control';
+  titleInput.setAttribute('aria-label', 'Issueのタイトル');
+  titleLabel.appendChild(titleInput);
+
+  const bodyLabel = document.createElement('label');
+  bodyLabel.textContent = '本文';
+  bodyLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
+  const bodyInput = document.createElement('textarea');
+  bodyInput.name = 'body';
+  bodyInput.rows = 18;
+  bodyInput.className = 'form-control';
+  bodyInput.setAttribute('aria-label', 'Issueの本文');
+  bodyInput.value = new URL(utilities.buildIssueCreateUrl({ ...repoContext, type }))
+    .searchParams.get('body') || '';
+  bodyLabel.appendChild(bodyInput);
+
+  const labelMessage = document.createElement('p');
+  labelMessage.textContent = `付与ラベル: ${type}`;
+  labelMessage.className = 'text-small color-fg-muted';
+  labelMessage.style.margin = '0';
+  const statusMessage = document.createElement('p');
+  statusMessage.setAttribute('role', 'status');
+  statusMessage.setAttribute('aria-live', 'polite');
+  statusMessage.style.color = 'var(--fgColor-danger, #cf222e)';
+  statusMessage.style.margin = '0';
+  const submitButton = document.createElement('button');
+  submitButton.type = 'submit';
+  submitButton.textContent = 'Issueを作成';
+  submitButton.className = 'btn btn-primary';
+  submitButton.style.cssText = 'align-self: flex-start;';
+  form.append(titleLabel, bodyLabel, labelMessage, statusMessage, submitButton);
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    submitIssueCreateForm(form, repoContext, type, content, submitButton, statusMessage);
+  });
+  content.replaceChildren(form);
+  titleInput.focus();
+}
+
+async function openIssueCreateDrawer(type) {
+  const repoContext = getRepositoryContext();
+  if (!repoContext) {
+    throw new Error('リポジトリ画面でのみ新規作成できます');
+  }
+
+  closeIssueCreateDrawer();
+  const utilities = await issueMapUtilities;
+  const backdrop = document.createElement('div');
+  backdrop.style.cssText = 'position: fixed; inset: 0; z-index: 9999; display: flex; justify-content: flex-end; background: var(--bgColor-default, #fff);';
+  const drawer = document.createElement('section');
+  drawer.setAttribute('role', 'dialog');
+  drawer.setAttribute('aria-modal', 'true');
+  drawer.setAttribute('aria-label', type === ISSUE_MAP_TYPES.COUNTERMEASURE ? '対策を新規作成' : '解析結果を新規作成');
+  drawer.style.cssText = 'display: flex; flex-direction: column; width: min(640px, 100vw); height: 100%; overflow: hidden; color: var(--fgColor-default, #1f2328); background: var(--bgColor-default, #fff); box-shadow: -8px 0 24px rgba(31, 35, 40, 0.2);';
+
+  const header = document.createElement('header');
+  header.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--borderColor-default, #d1d9e0);';
+  const title = document.createElement('h2');
+  title.textContent = type === ISSUE_MAP_TYPES.COUNTERMEASURE ? '対策を新規作成' : '解析結果を新規作成';
+  title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 600;';
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.textContent = '閉じる';
+  closeButton.className = 'btn btn-sm';
+  closeButton.setAttribute('aria-label', '新規作成ドロワーを閉じる');
+  header.append(title, closeButton);
+
+  const content = document.createElement('div');
+  content.style.cssText = 'flex: 1; overflow: auto; padding: 16px;';
+  drawer.append(header, content);
+  backdrop.appendChild(drawer);
+
+  const previousOverflow = document.body.style.overflow;
+  activeIssueCreateDrawer = {
+    backdrop,
+    previousOverflow,
+    returnFocus: document.activeElement,
+  };
+  document.body.style.overflow = 'hidden';
+  document.body.appendChild(backdrop);
+
+  closeButton.addEventListener('click', closeIssueCreateDrawer);
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) {
+      closeIssueCreateDrawer();
+    }
+  });
+  drawer.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeIssueCreateDrawer();
+    }
+  });
+  closeButton.focus();
+  renderIssueCreateForm(content, utilities, repoContext, type);
 }
 
 function getRepoNavigation() {
@@ -248,6 +410,17 @@ function createIssueMapPage() {
   emptyCreateActions.style.cssText = 'display: none; gap: 8px; margin-left: auto;';
   toolbar.append(refreshButton, statusMessage, emptyCreateActions);
 
+  const bindIssueCreateButton = (button, type) => {
+    button.dataset.issueCreateType = type;
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openIssueCreateDrawer(type).catch((error) => {
+        statusMessage.textContent = `新規作成画面を開けませんでした: ${error.message}`;
+      });
+    });
+  };
+
   const tableWrapper = document.createElement('div');
   tableWrapper.style.cssText = 'overflow-x: auto; border: 1px solid var(--borderColor-default, #d1d9e0); border-radius: 6px; background-color: var(--bgColor-default, #fff);';
   const table = document.createElement('table');
@@ -315,6 +488,7 @@ function createIssueMapPage() {
       createButton.textContent = '新規作成';
       createButton.className = 'btn btn-sm';
       createButton.href = utilities.buildIssueCreateUrl({ ...repoContext, type });
+      bindIssueCreateButton(createButton, type);
       createButton.style.cssText = 'margin-right: 8px; font-size: 9.33px;';
       const listButton = document.createElement('a');
       listButton.textContent = 'リンク';
@@ -337,6 +511,7 @@ function createIssueMapPage() {
       button.textContent = label;
       button.className = 'btn btn-primary btn-sm';
       button.href = utilities.buildIssueCreateUrl({ ...repoContext, type });
+      bindIssueCreateButton(button, type);
       button.style.fontSize = '9.33px';
       emptyCreateActions.appendChild(button);
     }
@@ -353,6 +528,7 @@ function createIssueMapPage() {
     createButton.textContent = '新規作成';
     createButton.className = 'btn btn-sm';
     createButton.href = utilities.buildIssueCreateUrl({ ...repoContext, type });
+    bindIssueCreateButton(createButton, type);
     createButton.style.cssText = 'margin-right: 8px; font-size: 9.33px;';
     const listButton = document.createElement('a');
     listButton.textContent = 'リンク';
@@ -493,7 +669,6 @@ function createIssueMapPage() {
     wrapper.loaded = false;
     loadIssues();
   });
-
   wrapper.append(heading, toolbar, tableWrapper);
   wrapper.loadIssues = loadIssues;
   wrapper.loading = false;
@@ -673,5 +848,15 @@ observer.observe(document.body || document.documentElement, {
 window.addEventListener('hashchange', syncIssueMapView);
 window.addEventListener('popstate', syncIssueMapView);
 document.addEventListener('click', leaveIssueMapForRepositoryNavigation, true);
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== 'OPEN_ISSUE_CREATE_DRAWER') {
+    return false;
+  }
+
+  openIssueCreateDrawer(message.issueType)
+    .then(() => sendResponse({ ok: true }))
+    .catch((error) => sendResponse({ ok: false, error: error.message }));
+  return true;
+});
 
 initializeIssueMapView();

@@ -13,7 +13,7 @@ function getCurrentRepoContext() {
         resolve(null);
         return;
       }
-      resolve({ owner: match[1], repo: match[2] });
+      resolve({ owner: match[1], repo: match[2], tabId: activeTab.id });
     });
   });
 }
@@ -24,11 +24,18 @@ async function openIssueCreate(type) {
     return;
   }
 
-  chrome.runtime.sendMessage({
-    type: 'OPEN_ISSUE_CREATE',
-    ...repoContext,
-    issueType: type,
-  });
+  try {
+    const response = await chrome.tabs.sendMessage(repoContext.tabId, {
+      type: 'OPEN_ISSUE_CREATE_DRAWER',
+      issueType: type,
+    });
+    if (!response?.ok) {
+      throw new Error(response?.error || '不明なエラー');
+    }
+  } catch (error) {
+    document.getElementById('issue-create-status').textContent =
+      `新規作成画面を開けませんでした: ${error.message}`;
+  }
 }
 
 async function openIssueList(type) {
@@ -58,4 +65,11 @@ document.getElementById('link-analysis-result').addEventListener('click', () => 
 
 document.getElementById('link-countermeasure').addEventListener('click', () => {
   openIssueList(ISSUE_TYPES.COUNTERMEASURE);
+});
+
+document.getElementById('open-extension-settings').addEventListener('click', () => {
+  chrome.runtime.openOptionsPage().catch((error) => {
+    document.getElementById('pat-status').textContent =
+      `拡張機能の設定を開けませんでした: ${error.message}`;
+  });
 });

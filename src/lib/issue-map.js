@@ -118,12 +118,31 @@ function parseCountermeasure(markdown) {
   };
 }
 
-function buildIssueCreateUrl({ owner, repo, type }) {
+function buildIssueCreateUrl({ owner, repo, type, title, body }) {
   const label = type === 'countermeasure' ? 'countermeasure' : 'analysis_result';
   const url = new URL(`https://github.com/${owner}/${repo}/issues/new`);
   url.searchParams.set('labels', label);
-  url.searchParams.set('body', ISSUE_CREATE_BODIES[label]);
+  url.searchParams.set('body', body ?? ISSUE_CREATE_BODIES[label]);
+  if (title !== undefined) {
+    url.searchParams.set('title', title);
+  }
   return url.toString();
+}
+
+function buildIssueCreateApiRequest({ owner, repo, type, title, body }) {
+  const label = type === 'countermeasure' ? 'countermeasure' : 'analysis_result';
+  const url = new URL(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`
+  );
+  return {
+    url: url.toString(),
+    method: 'POST',
+    payload: {
+      title: title.trim(),
+      body,
+      labels: [label],
+    },
+  };
 }
 
 function buildIssueListUrl({ owner, repo, type }) {
@@ -157,6 +176,7 @@ export {
   parseAnalysisResult,
   parseCountermeasure,
   buildIssueCreateUrl,
+  buildIssueCreateApiRequest,
   buildIssueListUrl,
   deriveCountermeasureStatus,
   getRepoContextFromPath,
