@@ -23,6 +23,6 @@ Issue Map View is a Chrome extension for GitHub repositories that visualizes FME
 
 ## Create issues with the GitHub API
 
-Issue listing and creation use the GitHub REST API from the extension service worker with a fine-grained personal access token. Grant the target repository **Issues: Read and write** permission and, to show linked pull request status, **Pull requests: Read**. Open the extension's **Details > Extension options** page (or its popup), enter the token, and select **PATを保存**. The settings page verifies the token and shows its status and expiration when GitHub provides it. The token is kept in `chrome.storage.session` and is cleared when the browser session ends or the extension is reloaded.
+Issue listing, creation, and metadata editing use the GitHub API from the extension service worker with a fine-grained personal access token. Grant the target repository **Issues: Read and write** permission, **Projects: Read and write** permission for Project v2 membership, and **Pull requests: Read** to show linked pull request status. Open the extension's **Details > Extension options** page (or its popup), enter the token, and select **PATを保存**. The settings page verifies the token and shows its status and expiration when GitHub provides it. The token is kept in `chrome.storage.session` and is cleared when the browser session ends or the extension is reloaded.
 
 This configuration uses a personal access token, not GitHub App authentication. A GitHub App flow would require a secure server to hold its private key and issue installation tokens.

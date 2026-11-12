@@ -52,18 +52,27 @@ function parseBulletList(markdown, heading) {
   const headingIndex = lines.findIndex((line) => (
     new RegExp(`^#{1,6}\\s+${heading}\\s*$`, 'i').test(line.trim())
   ));
-  if (headingIndex < 0) {
-    return [];
-  }
-
   const section = [];
-  for (const line of lines.slice(headingIndex + 1)) {
+  for (const line of lines.slice(headingIndex < 0 ? 0 : headingIndex + 1)) {
     if (/^#{1,6}\s/.test(line.trim())) {
-      break;
+      if (headingIndex >= 0) {
+        break;
+      }
+      continue;
     }
-    const trimmed = line.trim();
-    if (trimmed.startsWith('* ')) {
-      section.push(trimmed.replace(/^\*\s*/, ''));
+    const rawLine = line.trim();
+    const trimmed = rawLine.replace(/^[-*+]\s+/, '');
+    if (/^[-*+]\s+/.test(rawLine) || rawLine.startsWith('|')) {
+      const tableCells = trimmed.split('|').map((cell) => cell.trim()).filter(Boolean);
+      if (tableCells.length > 1 && tableCells.every((cell) => /^:?-{3,}:?$/.test(cell))) {
+        continue;
+      }
+      section.push(tableCells.length > 1 ? `${tableCells[0]}: ${tableCells[1]}` : trimmed);
+      continue;
+    }
+
+    if (headingIndex < 0 && /^[^:]{1,80}:\s*/.test(trimmed)) {
+      section.push(trimmed);
     }
   }
   return section.filter(Boolean);
@@ -71,12 +80,16 @@ function parseBulletList(markdown, heading) {
 
 function extractFieldValue(list, fieldLabel) {
   const labels = Array.isArray(fieldLabel) ? fieldLabel : [fieldLabel];
-  const matched = list.find((line) => labels.some((label) => line.startsWith(`${label}:`)));
-  if (!matched) {
-    return '';
+  for (const line of list) {
+    for (const label of labels) {
+      const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const match = line.match(new RegExp(`^\\**\\s*${escapedLabel}\\s*\\**\\s*:\\s*(.*)$`, 'i'));
+      if (match) {
+        return normalizeText(match[1]);
+      }
+    }
   }
-  const matchedLabel = labels.find((label) => matched.startsWith(`${label}:`));
-  return normalizeText(matched.slice(matchedLabel.length + 1));
+  return '';
 }
 
 function extractNumberValue(list, fieldLabel) {
@@ -145,6 +158,51 @@ function buildIssueCreateApiRequest({ owner, repo, type, title, body }) {
   };
 }
 
+function addAnalysisIssueReference(body, issueNumber) {
+  if (issueNumber == null) {
+    return body;
+  }
+  if (!Number.isInteger(issueNumber) || issueNumber < 1) {
+    throw new Error('Analysis Result Issue番号が不正です');
+  }
+  return `${body.trimEnd()}\n\nRelated analysis result: #${issueNumber}`;
+}
+
+function groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues) {
+  const analysisByNumber = new Map(analysisIssues.map((issue) => [issue.number, issue]));
+  const countermeasuresByNumber = new Map(
+    analysisIssues.map((issue) => [issue.number, []])
+  );
+  const unlinkedCountermeasures = [];
+
+  for (const issue of countermeasureIssues) {
+    const references = [...(issue.body || '').matchAll(
+      /^[ \t]*(?:[-*+][ \t]*)?(?:related[ \t]+)?analysis[ \t_-]*result(?:[ \t]+issue)?(?:[ \t]+number)?[ \t]*:[ \t]*([^\r\n]*)$/gim
+    )];
+    const analysisNumbers = new Set(
+      references.flatMap((reference) => [...reference[1].matchAll(/#?(\d+)/g)]
+        .map((numberMatch) => Number(numberMatch[1])))
+    );
+    const associatedAnalysisNumbers = [...analysisNumbers]
+      .filter((number) => analysisByNumber.has(number));
+    if (associatedAnalysisNumbers.length === 0) {
+      unlinkedCountermeasures.push(issue);
+      continue;
+    }
+    for (const analysisNumber of associatedAnalysisNumbers) {
+      countermeasuresByNumber.get(analysisNumber).push(issue);
+    }
+  }
+
+  return {
+    groups: analysisIssues.map((analysisIssue) => ({
+      analysisIssue,
+      countermeasureIssues: countermeasuresByNumber.get(analysisIssue.number),
+    })),
+    unlinkedCountermeasures,
+  };
+}
+
 function buildIssueListUrl({ owner, repo, type }) {
   const label = type === 'countermeasure' ? 'countermeasure' : 'analysis_result';
   const url = new URL(`https://github.com/${owner}/${repo}/issues`);
@@ -177,6 +235,8 @@ export {
   parseCountermeasure,
   buildIssueCreateUrl,
   buildIssueCreateApiRequest,
+  addAnalysisIssueReference,
+  groupCountermeasuresByAnalysis,
   buildIssueListUrl,
   deriveCountermeasureStatus,
   getRepoContextFromPath,

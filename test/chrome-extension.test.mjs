@@ -6,6 +6,8 @@ import {
   parseCountermeasure,
   buildIssueCreateUrl,
   buildIssueCreateApiRequest,
+  addAnalysisIssueReference,
+  groupCountermeasuresByAnalysis,
   buildIssueListUrl,
   deriveCountermeasureStatus,
 } from '../src/lib/issue-map.js';
@@ -50,6 +52,18 @@ test('parseAnalysisResult ignores bullets outside its section and leaves missing
   assert.equal(result.failureMode, 'issue title details');
   assert.equal(result.failureCause, 'worn bearing');
   assert.equal(result.severity, '');
+});
+
+test('parseAnalysisResult reads fields without a heading and accepts markdown formatting', () => {
+  const result = parseAnalysisResult(`
+- **Failure Mode**: motor does not start
+| Failure Cause | worn bearing |
+| **Severity** | 9 |
+`);
+
+  assert.equal(result.failureMode, 'motor does not start');
+  assert.equal(result.failureCause, 'worn bearing');
+  assert.equal(result.severity, 9);
 });
 
 test('parseAnalysisResult reads the English fields from the creation template', () => {
@@ -126,6 +140,18 @@ test('parseCountermeasure reads the English fields from the creation template', 
     owner: '',
     deadline: '',
   });
+});
+
+test('parseCountermeasure reads markdown fields without a section heading', () => {
+  const result = parseCountermeasure(`
+- **Content**: replace the bearing
+- Effect(Effect): production continues
+- RPN: 18
+`);
+
+  assert.equal(result.content, 'replace the bearing');
+  assert.equal(result.effectImpact, 'production continues');
+  assert.equal(result.rpn, 18);
 });
 
 test('buildIssueCreateUrl adds the analysis_result label for issue creation', () => {
@@ -214,6 +240,79 @@ test('buildIssueCreateApiRequest applies the countermeasure label', () => {
   });
 
   assert.deepEqual(request.payload.labels, ['countermeasure']);
+});
+
+test('addAnalysisIssueReference adds the related analysis issue to a countermeasure body', () => {
+  assert.equal(
+    addAnalysisIssueReference('### countermeasure\n* Content: replace bearing\n', 42),
+    '### countermeasure\n* Content: replace bearing\n\nRelated analysis result: #42'
+  );
+});
+
+test('addAnalysisIssueReference leaves unassociated countermeasure bodies unchanged', () => {
+  const body = '### countermeasure\n* Content: replace bearing';
+  assert.equal(addAnalysisIssueReference(body, null), body);
+});
+
+test('groupCountermeasuresByAnalysis maps one analysis issue to multiple countermeasures', () => {
+  const analysisIssues = [{ number: 12 }, { number: 34 }];
+  const countermeasureIssues = [
+    { number: 101, body: '### countermeasure\n* Related analysis result: #12' },
+    { number: 102, body: '### countermeasure\nRelated analysis result: #12' },
+    { number: 103, body: '### countermeasure\nRelated analysis result: #34' },
+  ];
+
+  const result = groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues);
+
+  assert.deepEqual(result.groups.map(({ analysisIssue, countermeasureIssues: linked }) => [
+    analysisIssue.number,
+    linked.map((issue) => issue.number),
+  ]), [
+    [12, [101, 102]],
+    [34, [103]],
+  ]);
+  assert.deepEqual(result.unlinkedCountermeasures, []);
+});
+
+test('groupCountermeasuresByAnalysis keeps missing and unknown references separate', () => {
+  const analysisIssues = [{ number: 12 }];
+  const countermeasureIssues = [
+    { number: 101, body: '### countermeasure\nRelated analysis result: #12' },
+    { number: 102, body: '### countermeasure\nRelated analysis result: #99' },
+    { number: 103, body: '### countermeasure' },
+  ];
+
+  const result = groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues);
+
+  assert.deepEqual(result.groups.map(({ analysisIssue, countermeasureIssues: linked }) => [
+    analysisIssue.number,
+    linked.map((issue) => issue.number),
+  ]), [[12, [101]]]);
+  assert.deepEqual(result.unlinkedCountermeasures.map((issue) => issue.number), [102, 103]);
+});
+
+test('groupCountermeasuresByAnalysis links one countermeasure to every referenced analysis issue', () => {
+  const analysisIssues = [{ number: 2 }, { number: 4 }, { number: 6 }, { number: 8 }];
+  const countermeasureIssues = [
+    { number: 101, body: 'Related analysis result: #2, #4' },
+    { number: 102, body: 'Related analysis result: #2; #6' },
+    { number: 103, body: 'Related analysis result: #4 #8' },
+    { number: 104, body: 'Related analysis result: #2 - #8' },
+    { number: 105, body: 'Related analysis result: #2, #2, #4' },
+  ];
+
+  const result = groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues);
+
+  assert.deepEqual(result.groups.map(({ analysisIssue, countermeasureIssues: linked }) => [
+    analysisIssue.number,
+    linked.map((issue) => issue.number),
+  ]), [
+    [2, [101, 102, 104, 105]],
+    [4, [101, 103, 105]],
+    [6, [102]],
+    [8, [103, 104]],
+  ]);
+  assert.deepEqual(result.unlinkedCountermeasures, []);
 });
 
 test('buildIssueListUrl filters the repository issues by label', () => {

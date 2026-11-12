@@ -31,10 +31,11 @@
 * 文字の大きさは、Githubのissue登録画面の2/3程度の文字サイズにして下さい。
 * 文字の色は、Githubのissue登録画面に近い色として下さい。
 * 表の色は、Githubのissue登録画面に近い色として下さい。
-* 先頭の行は、タイトルで、"Number", "Analysis Result", "Countermeasure"の列が表示されます。
-* 二行目は、Numberの列は空欄、Analysis Resultの列は次のセルに分解される。"Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", "Detection"の列が表示されます。Countermeasureの列は次のセルに分解される。"Content", "Effect(Effect)", "Effect(Occurrence)", "Effect(Detection)", "RPN", "Status", "Owner", "Deadline"の列が表示されます。
-* 三行目以降は、github issueの内容が表示されます。Numberの列は連番です。Analysis Resultの列は、github issueのタイトルとdescriptionに書かれたanalysis resultと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。Countermeasureの列は、github issueのタイトルとdescriptionに書かれたcountermeasureと書かれたheadingないに「*」で箇条書きされた内容と対策結果としてのPRの状況が各行に表示されます。
-* Issueが存在する行のNumber列にはIssueごとの「表示」ボタンを表示します。ボタンをクリックすると、該当するGitHub Issueの詳細画面を新しいタブで開きます。
+* 先頭の行は、"Analysis Result Number", "Analysis Result", "Countermeasure Number", "Countermeasure"の列が表示されます。
+* 二行目は各Number列が空欄で、Analysis Resultの列は"Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", "Detection"に、Countermeasureの列は"Content", "Effect(Effect)", "Effect(Occurrence)", "Effect(Detection)", "RPN", "Status", "Owner", "Deadline"に分解されます。
+* 三行目以降はGitHub Issue本文の内容を表示します。Analysis Resultの列は、analysis result見出し内の箇条書きや書式付きフィールドを各セルに表示し、Failure Modeが本文にない場合はIssueタイトルを表示します。Countermeasureの列も同様に本文から値を取得し、Contentがない場合はIssueタイトルを表示します。
+* Analysis Result Number列とCountermeasure Number列にそれぞれ該当するIssue番号をリンクとして表示し、クリックすると画面遷移せずにドロワーを開きます。ドロワーにはIssueタイトル・本文、ラベル、Assignee、Projects v2、マイルストーン、変更履歴を表示します。タイトル・本文・ラベル・Assignee・Projects v2・マイルストーンは編集して保存できます。
+* Countermeasureは本文に記載された `Related analysis result:` の後のIssue番号を使ってAnalysis Resultに紐づけ、Issue番号順などの位置による紐付けはしません。Issue番号はカンマ・セミコロン・空白・ハイフンで区切って複数記載できます。一つのCountermeasureが複数のAnalysis Resultを参照する場合、そのCountermeasureを各Analysis Resultの行に表示します。一つのAnalysis Resultに複数のCountermeasureを表示できます。紐付け情報がない、または参照先のAnalysis Resultが一つも存在しないCountermeasureは、Analysis Result欄を空にして独立した行に表示します。
 
 ### 解析結果
 * 解析結果の一つの要素はgithub issueの一つのissueです。analysis_resultというラベルをつけることで、解析結果の列に表示されます。
@@ -70,8 +71,9 @@
 
 * はじめ機能した際は、解析結果の列と、対策の列の両方が表示されており、それぞれブランクです。解析結果の列、対策の列の中にはブランクのボックスが表示されます。
 * ブランクのボックスには新規作成と、リンクの二つのボタンがあります。
-* Issueが一つも登録されていない場合は、画面上部にも解析結果と対策それぞれの「新規作成」ボタンを表示します。
-* Issue一覧は、Fine-grained PATを使ってGitHub REST APIから取得します。Issue一覧の取得に失敗した場合も、エラー表示とあわせて上部に新規作成ボタンを表示します。
+* Issueの有無にかかわらず、画面上部に解析結果と対策それぞれの「新規作成」ボタンを表示します。
+* 解析結果または対策のどちらか一方に複数Issueがあり、もう一方の行が不足する場合、不足している各行に「新規作成」ボタンを表示します。
+* Issue Mapには手動更新ボタンを表示せず、Issue作成・編集後に一覧を自動更新します。Issue一覧は、Fine-grained PATを使ってGitHub REST APIから取得し、analysis_resultおよびcountermeasureラベルを持つIssueを分類します。Issue一覧の取得に失敗した場合も、エラー表示とあわせて上部の新規作成ボタンを表示します。PR状態を取得できない場合もIssue内容は表示し、Status欄を「確認不可」とします。
 * 新規作成をクリックすると、ドロワーにIssue作成フォームを表示します。タイトルと本文を編集し、GitHub REST API経由でIssueを作成します。解析結果の列の場合はanalysis_result、対策の列の場合はcountermeasureというラベルがついたissueが作成されます。作成後は画面遷移せずに完了表示を行います。API認証には、対象リポジトリのIssues: Read and write権限を持つFine-grained PATを使用し、ブラウザーセッション中のみ保存します。
 * リンクをクリックすると、githubのissue一覧画面に遷移します。解析結果の列の場合は、analysis_resultというラベルがついたGithub issueの一覧が表示されます。対策の列の場合は、countermeasureというラベルがついたGithub issueの一覧が表示されます。
 
@@ -97,6 +99,7 @@
 ```
 
 ### 対策issueの作成
+* 解析結果の行にある対策の新規作成ボタンをクリックすると、その解析結果Issue番号を対策Issueの本文に `Related analysis result: #<Issue番号>` として記載した状態で、ドロワーに対策Issue作成フォームを表示します。上部の対策新規作成ボタンなど、特定の解析結果に紐づかない作成ではこの参照を追加しません。
 * 対策の列の新規作成ボタンをクリックすると、ドロワーにgithubの新規issue作成画面を表示します。
 * 新規issue作成画面では、countermeasureというラベルが設定された状態となります。
 * 新規issue作成画面では、タイトルとdescriptionに書かれたcountermeasureと書かれたheadingないに「*」で箇条書きされた内容が各行に表示されます。
