@@ -66,7 +66,7 @@ async function submitIssueCreateForm(form, repoContext, type, content, submitBut
   }
 
   submitButton.disabled = true;
-  submitButton.textContent = '作成中...';
+  submitButton.textContent = 'Creating...';
   try {
     const response = await chrome.runtime.sendMessage({
       type: 'CREATE_GITHUB_ISSUE',
@@ -77,23 +77,23 @@ async function submitIssueCreateForm(form, repoContext, type, content, submitBut
       body,
     });
     if (!response?.ok) {
-      throw new Error(response?.error || 'GitHub APIでIssueを作成できませんでした');
+      throw new Error(response?.error || 'Could not create the issue through the GitHub API');
     }
 
     const successMessage = document.createElement('p');
-    successMessage.textContent = 'Issueを作成しました。';
+    successMessage.textContent = 'Issue created.';
     successMessage.setAttribute('role', 'status');
     const issueLink = document.createElement('a');
     issueLink.href = response.issueUrl;
-    issueLink.textContent = '作成したIssueを表示';
+    issueLink.textContent = 'View the created issue';
     issueLink.target = '_blank';
     issueLink.rel = 'noopener noreferrer';
     content.replaceChildren(successMessage, issueLink);
     issueMapPageState?.page.loadIssues();
   } catch (error) {
-    statusMessage.textContent = `Issueを作成できませんでした: ${error.message}`;
+    statusMessage.textContent = `Could not create the issue: ${error.message}`;
     submitButton.disabled = false;
-    submitButton.textContent = 'Issueを作成';
+    submitButton.textContent = 'Create issue';
   }
 }
 
@@ -101,7 +101,7 @@ function renderIssueCreateForm(content, utilities, repoContext, type, relatedAna
   const form = document.createElement('form');
   form.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
   const titleLabel = document.createElement('label');
-  titleLabel.textContent = 'タイトル';
+  titleLabel.textContent = 'Title';
   titleLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
@@ -109,17 +109,17 @@ function renderIssueCreateForm(content, utilities, repoContext, type, relatedAna
   titleInput.required = true;
   titleInput.maxLength = 256;
   titleInput.className = 'form-control';
-  titleInput.setAttribute('aria-label', 'Issueのタイトル');
+  titleInput.setAttribute('aria-label', 'Issue title');
   titleLabel.appendChild(titleInput);
 
   const bodyLabel = document.createElement('label');
-  bodyLabel.textContent = '本文';
+  bodyLabel.textContent = 'Body';
   bodyLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
   const bodyInput = document.createElement('textarea');
   bodyInput.name = 'body';
   bodyInput.rows = 18;
   bodyInput.className = 'form-control';
-  bodyInput.setAttribute('aria-label', 'Issueの本文');
+  bodyInput.setAttribute('aria-label', 'Issue body');
   const defaultBody = new URL(utilities.buildIssueCreateUrl({ ...repoContext, type }))
     .searchParams.get('body') || '';
   bodyInput.value = type === ISSUE_MAP_TYPES.COUNTERMEASURE && relatedAnalysisIssue
@@ -128,7 +128,7 @@ function renderIssueCreateForm(content, utilities, repoContext, type, relatedAna
   bodyLabel.appendChild(bodyInput);
 
   const labelMessage = document.createElement('p');
-  labelMessage.textContent = `付与ラベル: ${type}`;
+  labelMessage.textContent = `Label to apply: ${type}`;
   labelMessage.className = 'text-small color-fg-muted';
   labelMessage.style.margin = '0';
   const statusMessage = document.createElement('p');
@@ -138,7 +138,7 @@ function renderIssueCreateForm(content, utilities, repoContext, type, relatedAna
   statusMessage.style.margin = '0';
   const submitButton = document.createElement('button');
   submitButton.type = 'submit';
-  submitButton.textContent = 'Issueを作成';
+  submitButton.textContent = 'Create issue';
   submitButton.className = 'btn btn-primary';
   submitButton.style.cssText = 'align-self: flex-start;';
   form.append(titleLabel, bodyLabel, labelMessage, statusMessage, submitButton);
@@ -153,7 +153,7 @@ function renderIssueCreateForm(content, utilities, repoContext, type, relatedAna
 async function openIssueCreateDrawer(type, relatedAnalysisIssue = null) {
   const repoContext = getRepositoryContext();
   if (!repoContext) {
-    throw new Error('リポジトリ画面でのみ新規作成できます');
+    throw new Error('Issues can only be created from a repository page');
   }
 
   closeIssueCreateDrawer();
@@ -163,19 +163,19 @@ async function openIssueCreateDrawer(type, relatedAnalysisIssue = null) {
   const drawer = document.createElement('section');
   drawer.setAttribute('role', 'dialog');
   drawer.setAttribute('aria-modal', 'true');
-  drawer.setAttribute('aria-label', type === ISSUE_MAP_TYPES.COUNTERMEASURE ? '対策を新規作成' : '解析結果を新規作成');
+  drawer.setAttribute('aria-label', type === ISSUE_MAP_TYPES.COUNTERMEASURE ? 'Create a countermeasure' : 'Create an analysis result');
   drawer.style.cssText = 'display: flex; flex-direction: column; width: min(640px, 100vw); height: 100%; overflow: hidden; color: var(--fgColor-default, #1f2328); background: var(--bgColor-default, #fff); box-shadow: -8px 0 24px rgba(31, 35, 40, 0.2);';
 
   const header = document.createElement('header');
   header.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--borderColor-default, #d1d9e0);';
   const title = document.createElement('h2');
-  title.textContent = type === ISSUE_MAP_TYPES.COUNTERMEASURE ? '対策を新規作成' : '解析結果を新規作成';
+  title.textContent = type === ISSUE_MAP_TYPES.COUNTERMEASURE ? 'Create a countermeasure' : 'Create an analysis result';
   title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 600;';
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
-  closeButton.textContent = '閉じる';
+  closeButton.textContent = 'Close';
   closeButton.className = 'btn btn-sm';
-  closeButton.setAttribute('aria-label', '新規作成ドロワーを閉じる');
+  closeButton.setAttribute('aria-label', 'Close the creation drawer');
   header.append(title, closeButton);
 
   const content = document.createElement('div');
@@ -214,24 +214,24 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
   const drawer = document.createElement('section');
   drawer.setAttribute('role', 'dialog');
   drawer.setAttribute('aria-modal', 'true');
-  drawer.setAttribute('aria-label', 'CountermeasureをAnalysis Resultにリンク');
+  drawer.setAttribute('aria-label', 'Link countermeasures to an analysis result');
   drawer.style.cssText = 'display: flex; flex-direction: column; width: min(640px, 100vw); height: 100%; overflow: hidden; color: var(--fgColor-default, #1f2328); background: var(--bgColor-default, #fff); box-shadow: -8px 0 24px rgba(31, 35, 40, 0.2);';
 
   const header = document.createElement('header');
   header.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--borderColor-default, #d1d9e0);';
   const title = document.createElement('h2');
-  title.textContent = 'Countermeasureをリンク';
+  title.textContent = 'Link countermeasures';
   title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 600;';
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
-  closeButton.textContent = '閉じる';
+  closeButton.textContent = 'Close';
   closeButton.className = 'btn btn-sm';
   header.append(title, closeButton);
 
   const content = document.createElement('div');
   content.style.cssText = 'flex: 1; overflow: auto; padding: 16px;';
   const loadingMessage = document.createElement('p');
-  loadingMessage.textContent = 'Countermeasureを読み込み中...';
+  loadingMessage.textContent = 'Loading countermeasures...';
   loadingMessage.setAttribute('role', 'status');
   content.appendChild(loadingMessage);
   drawer.append(header, content);
@@ -265,15 +265,15 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
     const form = document.createElement('form');
     form.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
     const analysisLabel = document.createElement('label');
-    analysisLabel.textContent = 'リンク先のAnalysis Result';
+    analysisLabel.textContent = 'Analysis result to link';
     analysisLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
     const analysisSelect = document.createElement('select');
     analysisSelect.className = 'form-control';
-    analysisSelect.setAttribute('aria-label', 'リンク先のAnalysis Result');
+    analysisSelect.setAttribute('aria-label', 'Analysis result to link');
     if (analysisIssues.length === 0) {
       const emptyAnalysisOption = document.createElement('option');
       emptyAnalysisOption.value = '';
-      emptyAnalysisOption.textContent = 'Analysis Resultがありません';
+      emptyAnalysisOption.textContent = 'No analysis results available';
       emptyAnalysisOption.selected = true;
       analysisSelect.appendChild(emptyAnalysisOption);
       analysisSelect.disabled = true;
@@ -297,7 +297,7 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
 
     const linkButton = document.createElement('button');
     linkButton.type = 'submit';
-    linkButton.textContent = '選択したCountermeasureをリンク';
+    linkButton.textContent = 'Link selected countermeasures';
     linkButton.className = 'btn btn-primary';
     linkButton.style.cssText = 'align-self: flex-start;';
     linkButton.disabled = analysisIssues.length === 0;
@@ -308,7 +308,7 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
     countermeasureList.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
     if (countermeasureIssues.length === 0) {
       const emptyCountermeasures = document.createElement('p');
-      emptyCountermeasures.textContent = 'ラベル「countermeasure」のIssueはありません。';
+      emptyCountermeasures.textContent = 'No issues with the "countermeasure" label were found.';
       emptyCountermeasures.className = 'text-small color-fg-muted';
       countermeasureList.appendChild(emptyCountermeasures);
       linkButton.disabled = true;
@@ -330,8 +330,8 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
         const existingLinks = document.createElement('small');
         existingLinks.className = 'color-fg-muted';
         existingLinks.textContent = currentReferences
-          ? `現在のリンク: ${currentReferences}`
-          : '現在のリンク: なし';
+          ? `Current links: ${currentReferences}`
+          : 'Current links: None';
         description.append(issueTitle, document.createElement('br'), existingLinks);
         label.append(checkbox, description);
         countermeasureList.appendChild(label);
@@ -343,15 +343,15 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
       const selectedIssueNumbers = [...form.querySelectorAll('input[name="countermeasureIssue"]:checked')]
         .map((input) => Number(input.value));
       if (selectedIssueNumbers.length === 0) {
-        status.textContent = 'リンクするCountermeasureを選択してください。';
+        status.textContent = 'Select at least one countermeasure to link.';
         return;
       }
       if (!analysisSelect.value) {
-        status.textContent = 'リンク先のAnalysis Resultを選択してください。';
+        status.textContent = 'Select an analysis result to link.';
         return;
       }
       linkButton.disabled = true;
-      status.textContent = 'リンクを保存中...';
+      status.textContent = 'Saving links...';
       try {
         const response = await chrome.runtime.sendMessage({
           type: 'LINK_COUNTERMEASURE_ISSUES',
@@ -360,12 +360,12 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
           countermeasureIssueNumbers: selectedIssueNumbers,
         });
         if (!response?.ok) {
-          throw new Error(response?.error || 'Issueのリンクを保存できませんでした');
+          throw new Error(response?.error || 'Could not save the issue links');
         }
-        status.textContent = `Countermeasure #${response.linkedIssueNumbers.join(', #')} をAnalysis Result #${response.analysisIssueNumber}にリンクしました。`;
+        status.textContent = `Linked countermeasure #${response.linkedIssueNumbers.join(', #')} to analysis result #${response.analysisIssueNumber}.`;
         issueMapPageState?.page.loadIssues();
       } catch (error) {
-        status.textContent = `リンクに失敗しました: ${error.message}`;
+        status.textContent = `Could not link the issues: ${error.message}`;
       } finally {
         linkButton.disabled = false;
       }
@@ -373,7 +373,7 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
     content.replaceChildren(form);
   } catch (error) {
     const errorMessage = document.createElement('p');
-    errorMessage.textContent = `Countermeasureを表示できませんでした: ${error.message}`;
+    errorMessage.textContent = `Could not display countermeasures: ${error.message}`;
     errorMessage.setAttribute('role', 'alert');
     content.replaceChildren(errorMessage);
   }
@@ -382,7 +382,7 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
 async function openIssueDetailsDrawer(issue) {
   const repoContext = getRepositoryContext();
   if (!repoContext) {
-    throw new Error('リポジトリ画面でのみIssue詳細を表示できます');
+    throw new Error('Issue details can only be viewed from a repository page');
   }
   closeIssueCreateDrawer();
 
@@ -391,7 +391,7 @@ async function openIssueDetailsDrawer(issue) {
   const drawer = document.createElement('section');
   drawer.setAttribute('role', 'dialog');
   drawer.setAttribute('aria-modal', 'true');
-  drawer.setAttribute('aria-label', `Issue #${issue.number} 詳細`);
+  drawer.setAttribute('aria-label', `Issue #${issue.number} details`);
   drawer.style.cssText = 'display: flex; flex-direction: column; width: min(720px, 100vw); height: 100%; overflow: hidden; color: var(--fgColor-default, #1f2328); background: var(--bgColor-default, #fff); box-shadow: -8px 0 24px rgba(31, 35, 40, 0.2);';
 
   const header = document.createElement('header');
@@ -401,14 +401,14 @@ async function openIssueDetailsDrawer(issue) {
   title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 600;';
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
-  closeButton.textContent = '閉じる';
+  closeButton.textContent = 'Close';
   closeButton.className = 'btn btn-sm';
   header.append(title, closeButton);
 
   const content = document.createElement('div');
   content.style.cssText = 'flex: 1; overflow: auto; padding: 16px;';
   const loadingMessage = document.createElement('p');
-  loadingMessage.textContent = 'Issue詳細を読み込み中...';
+  loadingMessage.textContent = 'Loading issue details...';
   loadingMessage.setAttribute('role', 'status');
   content.appendChild(loadingMessage);
   drawer.append(header, content);
@@ -438,13 +438,13 @@ async function openIssueDetailsDrawer(issue) {
       issueNumber: issue.number,
     });
     if (!result?.ok) {
-      throw new Error(result?.error || 'Issue詳細を取得できませんでした');
+      throw new Error(result?.error || 'Could not retrieve issue details');
     }
 
     const form = document.createElement('form');
     form.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
     const titleLabel = document.createElement('label');
-    titleLabel.textContent = 'タイトル';
+    titleLabel.textContent = 'Title';
     titleLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
@@ -452,17 +452,17 @@ async function openIssueDetailsDrawer(issue) {
     titleInput.required = true;
     titleInput.maxLength = 256;
     titleInput.className = 'form-control';
-    titleInput.setAttribute('aria-label', 'Issueのタイトル');
+    titleInput.setAttribute('aria-label', 'Issue title');
     titleLabel.appendChild(titleInput);
 
     const bodyLabel = document.createElement('label');
-    bodyLabel.textContent = '本文';
+    bodyLabel.textContent = 'Body';
     bodyLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
     const bodyInput = document.createElement('textarea');
     bodyInput.value = result.issue.body || '';
     bodyInput.rows = 14;
     bodyInput.className = 'form-control';
-    bodyInput.setAttribute('aria-label', 'Issueの本文');
+    bodyInput.setAttribute('aria-label', 'Issue body');
     bodyLabel.appendChild(bodyInput);
 
     const createMultiSelect = (labelText, values, selectedValues, getValue, getLabel) => {
@@ -486,7 +486,7 @@ async function openIssueDetailsDrawer(issue) {
     };
 
     const labelsSelect = createMultiSelect(
-      'ラベル',
+      'Labels',
       result.labels,
       result.issue.labels.map((label) => label.name),
       (label) => label.name,
@@ -500,19 +500,19 @@ async function openIssueDetailsDrawer(issue) {
       (assignee) => assignee.login
     );
     const milestoneLabel = document.createElement('label');
-    milestoneLabel.textContent = 'マイルストーン';
+    milestoneLabel.textContent = 'Milestone';
     milestoneLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
     const milestoneSelect = document.createElement('select');
     milestoneSelect.className = 'form-control';
-    milestoneSelect.setAttribute('aria-label', 'マイルストーン');
+    milestoneSelect.setAttribute('aria-label', 'Milestone');
     const noMilestone = document.createElement('option');
     noMilestone.value = '';
-    noMilestone.textContent = 'なし';
+    noMilestone.textContent = 'None';
     milestoneSelect.appendChild(noMilestone);
     for (const milestone of result.milestones) {
       const option = document.createElement('option');
       option.value = String(milestone.number);
-      option.textContent = `${milestone.title}${milestone.state === 'closed' ? '（完了）' : ''}`;
+      option.textContent = `${milestone.title}${milestone.state === 'closed' ? ' (closed)' : ''}`;
       milestoneSelect.appendChild(option);
     }
     if (result.issue.milestone
@@ -537,19 +537,19 @@ async function openIssueDetailsDrawer(issue) {
       projects,
       projectItems.map((project) => project.id),
       (project) => project.id,
-      (project) => `${project.title}${project.closed ? '（終了）' : ''}`
+      (project) => `${project.title}${project.closed ? ' (closed)' : ''}`
     );
     if (result.projectError) {
       projectSelect.disabled = true;
       const projectWarning = document.createElement('p');
-      projectWarning.textContent = `Projects v2を読み込めませんでした。PATのProjects: Read and write権限を確認してください。(${result.projectError})`;
+      projectWarning.textContent = `Could not load Projects v2. Check that the PAT has Projects: Read and write permission. (${result.projectError})`;
       projectWarning.setAttribute('role', 'status');
       projectWarning.style.cssText = 'color: var(--fgColor-danger, #cf222e);';
       form.appendChild(projectWarning);
     }
     if (projects.length === 0) {
       const noProjects = document.createElement('p');
-      noProjects.textContent = 'このリポジトリに利用可能なProjects v2がありません。';
+      noProjects.textContent = 'No Projects v2 are available for this repository.';
       noProjects.className = 'text-small color-fg-muted';
       form.appendChild(noProjects);
     }
@@ -559,19 +559,19 @@ async function openIssueDetailsDrawer(issue) {
     saveStatus.setAttribute('aria-live', 'polite');
     const saveButton = document.createElement('button');
     saveButton.type = 'submit';
-    saveButton.textContent = '変更を保存';
+    saveButton.textContent = 'Save changes';
     saveButton.className = 'btn btn-primary';
     saveButton.style.cssText = 'align-self: flex-start;';
     form.append(titleLabel, bodyLabel, labelsSelect, assigneeSelect, milestoneLabel, projectSelect, saveStatus, saveButton);
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!titleInput.value.trim()) {
-        saveStatus.textContent = 'タイトルを入力してください。';
+        saveStatus.textContent = 'Enter a title.';
         titleInput.focus();
         return;
       }
       saveButton.disabled = true;
-      saveStatus.textContent = '保存中...';
+      saveStatus.textContent = 'Saving...';
       try {
         const updateResult = await chrome.runtime.sendMessage({
           type: 'UPDATE_ISSUE_DETAILS',
@@ -587,37 +587,37 @@ async function openIssueDetailsDrawer(issue) {
             : [...projectSelect.selectedOptions].map((option) => option.value),
         });
         if (!updateResult?.ok) {
-          throw new Error(updateResult?.error || 'Issueを更新できませんでした');
+          throw new Error(updateResult?.error || 'Could not update the issue');
         }
-        saveStatus.textContent = '変更を保存しました。Issue Mapを更新します。';
+        saveStatus.textContent = 'Changes saved. Refreshing the Issue Map.';
         issueMapPageState?.page.loadIssues();
       } catch (error) {
-        saveStatus.textContent = `保存に失敗しました: ${error.message}`;
+        saveStatus.textContent = `Could not save changes: ${error.message}`;
       } finally {
         saveButton.disabled = false;
       }
     });
 
     const historyHeading = document.createElement('h3');
-    historyHeading.textContent = '変更履歴';
+    historyHeading.textContent = 'Change history';
     const historyList = document.createElement('ol');
     historyList.style.cssText = 'padding-left: 24px;';
     for (const event of result.events) {
       const item = document.createElement('li');
-      const actor = event.actor?.login || 'ユーザー不明';
+      const actor = event.actor?.login || 'Unknown user';
       const eventLabel = {
-        labeled: 'ラベルを追加',
-        unlabeled: 'ラベルを削除',
-        assigned: '担当者を設定',
-        unassigned: '担当者を解除',
-        milestoned: 'マイルストーンを設定',
-        demilestoned: 'マイルストーンを解除',
-        closed: 'Issueをクローズ',
-        reopened: 'Issueを再オープン',
-        'cross-referenced': '関連するIssue／Pull Requestを参照',
-        project_v2_item: 'Projects v2を変更',
+        labeled: 'Added label',
+        unlabeled: 'Removed label',
+        assigned: 'Assigned user',
+        unassigned: 'Unassigned user',
+        milestoned: 'Set milestone',
+        demilestoned: 'Removed milestone',
+        closed: 'Closed issue',
+        reopened: 'Reopened issue',
+        'cross-referenced': 'Referenced related issue or pull request',
+        project_v2_item: 'Updated Projects v2',
       }[event.event] || event.event;
-      const date = event.created_at ? new Date(event.created_at).toLocaleString('ja-JP') : '';
+      const date = event.created_at ? new Date(event.created_at).toLocaleString('en-US') : '';
       const detail = event.label?.name || event.assignee?.login || event.milestone?.title || '';
       const changes = event.changes
         ? Object.entries(event.changes)
@@ -625,7 +625,7 @@ async function openIssueDetailsDrawer(issue) {
             const previous = value?.from;
             const next = value?.to;
             if (previous !== undefined || next !== undefined) {
-              return `${key}: ${previous ?? 'なし'} → ${next ?? 'なし'}`;
+              return `${key}: ${previous ?? 'None'} → ${next ?? 'None'}`;
             }
             return `${key}: ${JSON.stringify(value)}`;
           })
@@ -637,13 +637,13 @@ async function openIssueDetailsDrawer(issue) {
     }
     if (result.events.length === 0) {
       const emptyHistory = document.createElement('li');
-      emptyHistory.textContent = '変更履歴はありません。';
+      emptyHistory.textContent = 'No change history.';
       historyList.appendChild(emptyHistory);
     }
     content.replaceChildren(form, historyHeading, historyList);
   } catch (error) {
     const errorMessage = document.createElement('p');
-    errorMessage.textContent = `Issue詳細を表示できませんでした: ${error.message}`;
+    errorMessage.textContent = `Could not display issue details: ${error.message}`;
     errorMessage.setAttribute('role', 'alert');
     content.replaceChildren(errorMessage);
   }
@@ -747,7 +747,7 @@ async function fetchIssueMapData(repoContext) {
     ...repoContext,
   });
   if (!result?.ok) {
-    throw new Error(result?.error || 'Issue一覧を取得できませんでした');
+    throw new Error(result?.error || 'Could not retrieve the issue list');
   }
   return result;
 }
@@ -783,7 +783,7 @@ function createIssueMapPage() {
       event.preventDefault();
       event.stopPropagation();
       openIssueCreateDrawer(type, relatedAnalysisIssue).catch((error) => {
-        statusMessage.textContent = `新規作成画面を開けませんでした: ${error.message}`;
+        statusMessage.textContent = `Could not open the creation form: ${error.message}`;
       });
     });
   };
@@ -793,7 +793,7 @@ function createIssueMapPage() {
       event.preventDefault();
       event.stopPropagation();
       openIssueLinkDrawer(repoContext, relatedAnalysisIssue).catch((error) => {
-        statusMessage.textContent = `リンク画面を開けませんでした: ${error.message}`;
+        statusMessage.textContent = `Could not open the linking form: ${error.message}`;
       });
     });
   };
@@ -843,7 +843,7 @@ function createIssueMapPage() {
   const initialRow = document.createElement('tr');
   const initialCell = document.createElement('td');
   initialCell.colSpan = 20;
-  initialCell.textContent = '読み込み中...';
+  initialCell.textContent = 'Loading...';
   initialCell.style.cssText = 'padding: 16px; text-align: center; color: var(--fgColor-muted, #656d76);';
   initialRow.appendChild(initialCell);
   body.appendChild(initialRow);
@@ -865,13 +865,13 @@ function createIssueMapPage() {
       message.textContent = label;
       message.style.cssText = 'margin: 0 0 12px;';
       const createButton = document.createElement('a');
-      createButton.textContent = '新規作成';
+      createButton.textContent = 'Create new';
       createButton.className = 'btn btn-sm';
       createButton.href = utilities.buildIssueCreateUrl({ ...repoContext, type });
       bindIssueCreateButton(createButton, type);
       createButton.style.cssText = 'margin-right: 8px; font-size: 9.33px;';
       const listButton = document.createElement('a');
-      listButton.textContent = 'リンク';
+      listButton.textContent = 'Link';
       listButton.className = 'btn btn-sm';
       listButton.href = utilities.buildIssueListUrl({ ...repoContext, type });
       listButton.style.fontSize = '9.33px';
@@ -880,17 +880,17 @@ function createIssueMapPage() {
       row.appendChild(cell);
     };
     appendNumberCell();
-    appendEmptyCategoryCell('解析結果はありません。', ISSUE_MAP_TYPES.ANALYSIS_RESULT, 9);
+    appendEmptyCategoryCell('No analysis results.', ISSUE_MAP_TYPES.ANALYSIS_RESULT, 9);
     appendNumberCell();
-    appendEmptyCategoryCell('対策はありません。', ISSUE_MAP_TYPES.COUNTERMEASURE, 8);
+    appendEmptyCategoryCell('No countermeasures.', ISSUE_MAP_TYPES.COUNTERMEASURE, 8);
     body.replaceChildren(row);
   };
 
   const showCreateActions = () => {
     createActions.replaceChildren();
     for (const [label, type] of [
-      ['解析結果を新規作成', ISSUE_MAP_TYPES.ANALYSIS_RESULT],
-      ['対策を新規作成', ISSUE_MAP_TYPES.COUNTERMEASURE],
+      ['Create analysis result', ISSUE_MAP_TYPES.ANALYSIS_RESULT],
+      ['Create countermeasure', ISSUE_MAP_TYPES.COUNTERMEASURE],
     ]) {
       const button = document.createElement('a');
       button.textContent = label;
@@ -911,13 +911,13 @@ function createIssueMapPage() {
     text.textContent = message;
     text.style.cssText = 'margin-bottom: 8px; color: var(--fgColor-muted, #656d76);';
     const createButton = document.createElement('a');
-    createButton.textContent = '新規作成';
+    createButton.textContent = 'Create new';
     createButton.className = 'btn btn-sm';
     createButton.href = utilities.buildIssueCreateUrl({ ...repoContext, type });
     bindIssueCreateButton(createButton, type, relatedAnalysisIssue);
     createButton.style.cssText = 'margin-right: 8px; font-size: 9.33px;';
     const listButton = document.createElement('a');
-    listButton.textContent = 'リンク';
+    listButton.textContent = 'Link';
     listButton.className = 'btn btn-sm';
     listButton.href = utilities.buildIssueListUrl({ ...repoContext, type });
     listButton.style.fontSize = '9.33px';
@@ -952,12 +952,12 @@ function createIssueMapPage() {
           issueLink.target = '_blank';
           issueLink.rel = 'noopener noreferrer';
           issueLink.textContent = `#${issue.number}`;
-          issueLink.title = `${issue.title} (#${issue.number}) を表示`;
+          issueLink.title = `View ${issue.title} (#${issue.number})`;
           issueLink.setAttribute('aria-label', issueLink.title);
           issueLink.addEventListener('click', (event) => {
             event.preventDefault();
             openIssueDetailsDrawer(issue).catch((error) => {
-              statusMessage.textContent = `Issue詳細を開けませんでした: ${error.message}`;
+              statusMessage.textContent = `Could not open issue details: ${error.message}`;
             });
           });
           issueReference.appendChild(issueLink);
@@ -985,14 +985,14 @@ function createIssueMapPage() {
         if (analysisIssue) {
           row.appendChild(createEmptyCategoryCell(
             ISSUE_MAP_TYPES.ANALYSIS_RESULT,
-            '解析結果はありません。',
+            'No analysis result is linked.',
             utilities
           ));
         } else {
           const emptyAnalysisCell = document.createElement('td');
           emptyAnalysisCell.colSpan = 9;
           emptyAnalysisCell.style.cssText = 'padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); color: var(--fgColor-muted, #656d76); vertical-align: top;';
-          emptyAnalysisCell.textContent = '紐づく解析結果はありません。';
+          emptyAnalysisCell.textContent = 'No linked analysis result.';
           row.appendChild(emptyAnalysisCell);
         }
       }
@@ -1017,7 +1017,7 @@ function createIssueMapPage() {
       } else {
         row.appendChild(createEmptyCategoryCell(
             ISSUE_MAP_TYPES.COUNTERMEASURE,
-            '対策はありません。',
+            'No countermeasures.',
             utilities,
             analysisIssue
         ));
@@ -1033,7 +1033,7 @@ function createIssueMapPage() {
     }
     wrapper.loading = true;
     let utilities;
-    statusMessage.textContent = '読み込み中...';
+    statusMessage.textContent = 'Loading...';
     try {
       utilities = await issueMapUtilities;
       showCreateActions();
@@ -1058,9 +1058,9 @@ function createIssueMapPage() {
       } else {
         renderIssues(analysisIssues, countermeasureIssues, utilities);
       }
-      statusMessage.textContent = `${analysisIssues.length} 件の解析結果、${countermeasureIssues.length} 件の対策`;
+      statusMessage.textContent = `${analysisIssues.length} analysis results, ${countermeasureIssues.length} countermeasures`;
     } catch (error) {
-      statusMessage.textContent = `読み込みに失敗しました: ${error.message}`;
+      statusMessage.textContent = `Could not load issues: ${error.message}`;
       const errorRow = document.createElement('tr');
       const errorCell = document.createElement('td');
       errorCell.colSpan = 20;

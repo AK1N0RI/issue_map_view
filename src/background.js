@@ -23,7 +23,7 @@ function isValidRepoSegment(value) {
 async function getGitHubPat() {
   const { githubPat } = await chrome.storage.session.get('githubPat');
   if (typeof githubPat !== 'string' || !githubPat) {
-    throw new Error('拡張機能のオプションでFine-grained PATを設定してください');
+    throw new Error('Configure a fine-grained PAT in the extension options');
   }
   return githubPat;
 }
@@ -41,7 +41,7 @@ async function storeIssueMapDataCache(key, data) {
       },
     });
   } catch (error) {
-    console.error('Issue Mapの一時キャッシュを保存できませんでした', error);
+    console.error('Could not save the temporary Issue Map cache', error);
   }
 }
 
@@ -62,7 +62,7 @@ async function cacheCreatedIssue(owner, repo, issueType, issue) {
       : 'countermeasureIssues';
     const issues = (data[target] || []).filter((item) => item.number !== issue.number);
     issues.push(issueType === GITHUB_ISSUE_TYPE.COUNTERMEASURE
-      ? { ...issue, countermeasureStatus: '未着手' }
+      ? { ...issue, countermeasureStatus: 'Not started' }
       : issue);
     return { ...data, [target]: issues };
   });
@@ -88,7 +88,7 @@ async function updateCachedIssue(owner, repo, issueNumber, issue) {
     if (hasLabel(GITHUB_ISSUE_TYPE.COUNTERMEASURE)) {
       countermeasureIssues.push({
         ...updatedIssue,
-        countermeasureStatus: existing?.countermeasureStatus || '未着手',
+        countermeasureStatus: existing?.countermeasureStatus || 'Not started',
       });
     }
     return { analysisIssues, countermeasureIssues };
@@ -103,13 +103,13 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     .then((items) => Object.keys(items)
       .filter((key) => key.startsWith(ISSUE_MAP_CACHE_PREFIX)))
     .then((keys) => (keys.length > 0 ? chrome.storage.session.remove(keys) : undefined))
-    .catch((error) => console.error('Issue Mapキャッシュを削除できませんでした', error));
+    .catch((error) => console.error('Could not clear the Issue Map cache', error));
 });
 
 async function fetchGitHubApi(url, githubPat) {
   const apiUrl = new URL(url);
   if (apiUrl.origin !== 'https://api.github.com') {
-    throw new Error('GitHub APIの送信先が不正です');
+    throw new Error('The GitHub API destination is invalid');
   }
   const response = await fetch(apiUrl, {
     headers: {
@@ -122,16 +122,16 @@ async function fetchGitHubApi(url, githubPat) {
   try {
     data = await response.json();
   } catch {
-    throw new Error(`GitHub APIから有効な応答がありませんでした (${response.status})`);
+    throw new Error(`GitHub API returned an invalid response (${response.status})`);
   }
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error('PATが無効または期限切れです。新しいPATを設定してください');
+      throw new Error('The PAT is invalid or expired. Configure a new PAT.');
     }
     if (response.status === 403) {
-      throw new Error('PATに対象リポジトリへのアクセスとIssues: Read and write権限が必要です');
+      throw new Error('The PAT requires repository access and Issues: Read and write permission');
     }
-    throw new Error(data.message || `GitHub APIエラー (${response.status})`);
+    throw new Error(data.message || `GitHub API error (${response.status})`);
   }
   return { data, expiration: response.headers.get('github-authentication-token-expiration') };
 }
@@ -151,11 +151,11 @@ async function fetchGitHubGraphQL(query, variables, githubPat) {
   try {
     result = await response.json();
   } catch {
-    throw new Error(`GitHub GraphQLから有効な応答がありませんでした (${response.status})`);
+    throw new Error(`GitHub GraphQL returned an invalid response (${response.status})`);
   }
   if (!response.ok || result.errors?.length) {
     throw new Error(result.errors?.map((error) => error.message).join('; ')
-      || `GitHub GraphQLエラー (${response.status})`);
+      || `GitHub GraphQL error (${response.status})`);
   }
   return result.data;
 }
@@ -168,7 +168,7 @@ async function fetchAllPages(url, githubPat) {
     pagedUrl.searchParams.set('page', String(page));
     const { data } = await fetchGitHubApi(pagedUrl, githubPat);
     if (!Array.isArray(data)) {
-      throw new Error('GitHub APIが不正な一覧を返しました');
+      throw new Error('GitHub API returned an invalid list');
     }
     items.push(...data);
     if (data.length < 100) {
@@ -211,7 +211,7 @@ async function getLinkedPullRequest(issue, owner, repo, githubPat) {
   } catch (error) {
     return {
       ...issue,
-      countermeasureStatus: '確認不可',
+      countermeasureStatus: 'Unavailable',
       countermeasureStatusError: error.message,
     };
   }
@@ -225,7 +225,7 @@ async function getLinkedPullRequest(issue, owner, repo, githubPat) {
     .filter((source) => source?.pull_request?.url);
 
   if (linkedPullRequests.length === 0) {
-    return { ...issue, countermeasureStatus: '未着手' };
+    return { ...issue, countermeasureStatus: 'Not started' };
   }
 
   let pullRequests;
@@ -239,15 +239,15 @@ async function getLinkedPullRequest(issue, owner, repo, githubPat) {
   } catch (error) {
     return {
       ...issue,
-      countermeasureStatus: '確認不可',
+      countermeasureStatus: 'Unavailable',
       countermeasureStatusError: error.message,
     };
   }
   return {
     ...issue,
     countermeasureStatus: pullRequests.some((pullRequest) => pullRequest.merged_at)
-      ? '完了'
-      : '未完了',
+      ? 'Complete'
+      : 'In progress',
   };
 }
 
@@ -267,7 +267,7 @@ async function mapWithConcurrency(items, concurrency, mapper) {
 
 async function fetchIssueMapData(message) {
   if (!isValidRepoSegment(message.owner) || !isValidRepoSegment(message.repo)) {
-    throw new Error('リポジトリ情報が不正です');
+    throw new Error('Repository information is invalid');
   }
   const cacheKey = getIssueMapCacheKey(message.owner, message.repo);
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
@@ -307,7 +307,7 @@ async function fetchFreshIssueMapData(message) {
 async function fetchIssueDetails(message) {
   if (!isValidRepoSegment(message.owner) || !isValidRepoSegment(message.repo)
     || !Number.isInteger(message.issueNumber) || message.issueNumber < 1) {
-    throw new Error('Issue情報が不正です');
+    throw new Error('Issue information is invalid');
   }
   const githubPat = await getGitHubPat();
   const baseUrl = `https://api.github.com/repos/${encodeURIComponent(message.owner)}/${encodeURIComponent(message.repo)}`;
@@ -358,14 +358,14 @@ async function fetchIssueDetails(message) {
 async function updateIssueDetails(message) {
   if (!isValidRepoSegment(message.owner) || !isValidRepoSegment(message.repo)
     || !Number.isInteger(message.issueNumber) || message.issueNumber < 1) {
-    throw new Error('Issue情報が不正です');
+    throw new Error('Issue information is invalid');
   }
   if (typeof message.title !== 'string' || !message.title.trim() || message.title.length > 256
     || typeof message.body !== 'string'
     || !Array.isArray(message.labels) || !Array.isArray(message.assignees)
     || (message.projectIds !== null && !Array.isArray(message.projectIds))
     || (message.milestone !== null && !Number.isInteger(message.milestone))) {
-    throw new Error('更新するIssue情報が不正です');
+    throw new Error('The issue update data is invalid');
   }
   const githubPat = await getGitHubPat();
   const baseUrl = `https://api.github.com/repos/${encodeURIComponent(message.owner)}/${encodeURIComponent(message.repo)}`;
@@ -389,10 +389,10 @@ async function updateIssueDetails(message) {
   try {
     issue = await issueResponse.json();
   } catch {
-    throw new Error(`GitHub APIから有効な応答がありませんでした (${issueResponse.status})`);
+    throw new Error(`GitHub API returned an invalid response (${issueResponse.status})`);
   }
   if (!issueResponse.ok) {
-    throw new Error(issue.message || `Issueを更新できませんでした (${issueResponse.status})`);
+    throw new Error(issue.message || `Could not update the issue (${issueResponse.status})`);
   }
   await updateCachedIssue(message.owner, message.repo, message.issueNumber, issue);
 
@@ -415,7 +415,7 @@ async function updateIssueDetails(message) {
       githubPat
     );
     if (!data?.node || !Array.isArray(data.node.projectItems?.nodes)) {
-      throw new Error('IssueのProjects v2情報を取得できませんでした');
+      throw new Error('Could not retrieve the issue Projects v2 data');
     }
     const currentItems = data.node.projectItems.nodes
       .filter((item) => item.project?.id);
@@ -450,7 +450,7 @@ async function updateIssueDetails(message) {
     }
     await Promise.all(mutations);
   } catch (error) {
-    throw new Error(`Issueのタイトル・本文などは保存されましたが、Projects v2の更新に失敗しました: ${error.message}`);
+    throw new Error(`The issue title, body, and other fields were saved, but Projects v2 could not be updated: ${error.message}`);
   }
   return { issueUrl: issue.html_url };
 }
@@ -461,7 +461,7 @@ async function linkCountermeasureIssues(message) {
     || !Array.isArray(message.countermeasureIssueNumbers)
     || message.countermeasureIssueNumbers.length === 0
     || message.countermeasureIssueNumbers.some((number) => !Number.isInteger(number) || number < 1)) {
-    throw new Error('Issueの紐付け情報が不正です');
+    throw new Error('The issue linking data is invalid');
   }
   const countermeasureIssueNumbers = [...new Set(message.countermeasureIssueNumbers)];
   const githubPat = await getGitHubPat();
@@ -473,7 +473,7 @@ async function linkCountermeasureIssues(message) {
   if (analysisIssue.pull_request || !analysisIssue.labels?.some(
     (label) => label.name?.toLowerCase() === GITHUB_ISSUE_TYPE.ANALYSIS_RESULT
   )) {
-    throw new Error(`Issue #${message.analysisIssueNumber} はAnalysis Resultではありません`);
+    throw new Error(`Issue #${message.analysisIssueNumber} is not an analysis result`);
   }
 
   const linkedIssueNumbers = [];
@@ -483,7 +483,7 @@ async function linkCountermeasureIssues(message) {
       if (issue.pull_request || !issue.labels?.some(
         (label) => label.name?.toLowerCase() === GITHUB_ISSUE_TYPE.COUNTERMEASURE
       )) {
-        throw new Error(`Issue #${issueNumber} はCountermeasureではありません`);
+        throw new Error(`Issue #${issueNumber} is not a countermeasure`);
       }
 
       const body = updateAnalysisIssueReferences(issue.body || '', [message.analysisIssueNumber]);
@@ -503,10 +503,10 @@ async function linkCountermeasureIssues(message) {
         try {
           result = await response.json();
         } catch {
-          throw new Error(`GitHub APIから有効な応答がありませんでした (${response.status})`);
+          throw new Error(`GitHub API returned an invalid response (${response.status})`);
         }
         if (!response.ok) {
-          throw new Error(result.message || `Issue #${issueNumber} を更新できませんでした (${response.status})`);
+          throw new Error(result.message || `Could not update issue #${issueNumber} (${response.status})`);
         }
         updatedIssue = result;
       }
@@ -515,7 +515,7 @@ async function linkCountermeasureIssues(message) {
     } catch (error) {
       if (linkedIssueNumbers.length > 0) {
         throw new Error(
-          `一部の紐付けを保存しました（#${linkedIssueNumbers.join(', #')}）。Issue #${issueNumber} で失敗: ${error.message}`
+          `Some links were saved (#${linkedIssueNumbers.join(', #')}). Failed on issue #${issueNumber}: ${error.message}`
         );
       }
       throw error;
@@ -544,17 +544,17 @@ async function checkGitHubPat() {
 
 async function createIssue(message) {
   if (!isValidRepoSegment(message.owner) || !isValidRepoSegment(message.repo)) {
-    throw new Error('リポジトリ情報が不正です');
+    throw new Error('Repository information is invalid');
   }
   if (message.issueType !== GITHUB_ISSUE_TYPE.ANALYSIS_RESULT
     && message.issueType !== GITHUB_ISSUE_TYPE.COUNTERMEASURE) {
-    throw new Error('Issueの種類が不正です');
+    throw new Error('The issue type is invalid');
   }
   if (typeof message.title !== 'string' || !message.title.trim()) {
-    throw new Error('Issueのタイトルを入力してください');
+    throw new Error('Enter an issue title');
   }
   if (typeof message.body !== 'string') {
-    throw new Error('Issueの本文が不正です');
+    throw new Error('The issue body is invalid');
   }
 
   const githubPat = await getGitHubPat();
@@ -581,19 +581,19 @@ async function createIssue(message) {
   try {
     result = await response.json();
   } catch {
-    throw new Error(`GitHub APIから有効な応答がありませんでした (${response.status})`);
+    throw new Error(`GitHub API returned an invalid response (${response.status})`);
   }
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error('PATが無効または期限切れです。新しいPATを設定してください');
+      throw new Error('The PAT is invalid or expired. Configure a new PAT.');
     }
     if (response.status === 403) {
-      throw new Error('PATに対象リポジトリのIssues: Read and write権限が必要です');
+      throw new Error('The PAT requires Issues: Read and write permission for the repository');
     }
-    throw new Error(result.message || `GitHub APIエラー (${response.status})`);
+    throw new Error(result.message || `GitHub API error (${response.status})`);
   }
   if (typeof result.html_url !== 'string' || !Number.isInteger(result.number)) {
-    throw new Error('GitHub APIの応答にIssue情報がありません');
+    throw new Error('The GitHub API response did not contain issue data');
   }
   await cacheCreatedIssue(message.owner, message.repo, message.issueType, result);
   return { issueUrl: result.html_url, issueNumber: result.number };
@@ -664,7 +664,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         ok: true,
         configured: true,
         valid: false,
-        expired: error.message.includes('無効または期限切れ'),
+        expired: error.message.includes('invalid or expired'),
         error: error.message,
       }));
     return true;

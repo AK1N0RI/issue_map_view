@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <title>Issue Map View</title>
@@ -54,25 +54,25 @@
     <p id="issue-create-status" role="status"></p>
 
     <div class="section">
-      <div class="small">解析結果</div>
-      <button id="new-analysis-result">新規作成</button>
-      <button id="link-analysis-result">リンク</button>
+      <div class="small">Analysis results</div>
+      <button id="new-analysis-result">Create new</button>
+      <button id="link-analysis-result">Link</button>
     </div>
 
     <div class="section">
-      <div class="small">対策</div>
-      <button id="new-countermeasure">新規作成</button>
-      <button id="link-countermeasure">リンク</button>
+      <div class="small">Countermeasures</div>
+      <button id="new-countermeasure">Create new</button>
+      <button id="link-countermeasure">Link</button>
     </div>
 
     <div class="section">
       <label class="small" for="github-pat">GitHub Fine-grained PAT</label>
       <input id="github-pat" class="token-input" type="password" autocomplete="off" spellcheck="false" />
-      <div class="small">対象リポジトリの Issues: Read and write 権限が必要です。トークンはブラウザーまたは拡張機能を再起動・再読み込みするまで保存されます。</div>
-      <button id="save-github-pat" type="button">PATを保存</button>
-      <button id="clear-github-pat" type="button">PATを削除</button>
+      <div class="small">Requires Issues: Read and write access to the target repository. The token is stored until the browser session ends or the extension is reloaded.</div>
+      <button id="save-github-pat" type="button">Save token</button>
+      <button id="clear-github-pat" type="button">Remove token</button>
       <p id="pat-status" role="status" aria-live="polite"></p>
-      <button id="open-extension-settings" type="button">拡張機能の設定を開く</button>
+      <button id="open-extension-settings" type="button">Open extension settings</button>
     </div>
 
     <script src="pat-settings.js"></script>

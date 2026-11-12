@@ -1,20 +1,20 @@
 const ISSUE_FIELDS = {
   ANALYSIS_RESULT: {
-    failureMode: '故障モード',
-    failureCause: '故障原因',
-    failureCategory: '故障分類',
-    prevention: '防止策',
-    detectionMethod: '検出方法',
-    effect: '影響',
-    severity: '重大度',
-    occurrence: '発生度',
-    detection: '検出度',
+    failureMode: 'Failure Mode',
+    failureCause: 'Failure Cause',
+    failureCategory: 'Failure Classification',
+    prevention: 'Preventive Measure',
+    detectionMethod: 'Detection Method',
+    effect: 'Effect',
+    severity: 'Severity',
+    occurrence: 'Occurrence',
+    detection: 'Detection',
   },
   COUNTERMEASURE: {
-    content: '対策内容',
-    effectImpact: '対策効果(影響)',
-    effectOccurrence: '対策効果(発生)',
-    effectDetection: '対策効果(検出)',
+    content: 'Content',
+    effectImpact: 'Effect(Effect)',
+    effectOccurrence: 'Effect(Occurrence)',
+    effectDetection: 'Effect(Detection)',
     rpn: 'RPN',
   },
 };
@@ -178,7 +178,7 @@ function getAnalysisIssueNumbers(body) {
 function updateAnalysisIssueReferences(body, issueNumbers) {
   if (!Array.isArray(issueNumbers)
     || issueNumbers.some((number) => !Number.isInteger(number) || number < 1)) {
-    throw new Error('Analysis Result Issue番号が不正です');
+    throw new Error('The analysis result issue number is invalid');
   }
   const lines = String(body || '').split(/\r?\n/);
   const existingReferences = getAnalysisIssueNumbers(body);
@@ -229,12 +229,12 @@ function buildIssueListUrl({ owner, repo, type }) {
 
 function deriveCountermeasureStatus({ merged, hasPullRequest }) {
   if (merged === true) {
-    return '完了';
+    return 'Complete';
   }
   if (hasPullRequest === true) {
-    return '未完了';
+    return 'In progress';
   }
-  return '未着手';
+  return 'Not started';
 }
 
 function getRepoContextFromPath(pathname) {

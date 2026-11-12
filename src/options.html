@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Issue Map View 設定</title>
+    <title>Issue Map View Settings</title>
     <style>
       body {
         max-width: 640px;
@@ -47,8 +47,8 @@
     </style>
   </head>
   <body>
-    <h1>Issue Map View 設定</h1>
-    <p class="help">Fine-grained personal access token (PAT) を設定します。対象リポジトリへのアクセスと Issues: Read and write 権限が必要です。対策に紐づくPull Requestの状態確認には Pull requests: Read 権限、Project v2の表示・編集には Projects: Read and write 権限も必要です。PATはブラウザーまたは拡張機能を再起動・再読み込みするまでのセッション中のみ保存されます。</p>
+    <h1>Issue Map View Settings</h1>
+    <p class="help">Configure a fine-grained personal access token (PAT). The token requires access to the target repository and Issues: Read and write permission. Pull requests: Read permission is required to check the status of pull requests linked to countermeasures. Projects: Read and write permission is required to view and edit Project v2 membership. The token is stored only for the current browser session and is removed when the browser session ends or the extension is reloaded.</p>
 
     <label for="github-pat">GitHub Fine-grained PAT</label>
     <input
@@ -59,9 +59,9 @@
       spellcheck="false"
       aria-describedby="pat-help"
     />
-    <p id="pat-help" class="help">PAT自体は画面に再表示されません。変更する場合は新しいPATを入力して保存してください。</p>
-    <button id="save-github-pat" type="button">PATを保存</button>
-    <button id="clear-github-pat" type="button">PATを削除</button>
+    <p id="pat-help" class="help">The token itself is never displayed again. To replace it, enter a new token and save it.</p>
+    <button id="save-github-pat" type="button">Save token</button>
+    <button id="clear-github-pat" type="button">Remove token</button>
     <p id="pat-status" role="status" aria-live="polite"></p>
 
     <script src="pat-settings.js"></script>

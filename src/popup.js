@@ -30,11 +30,11 @@ async function openIssueCreate(type) {
       issueType: type,
     });
     if (!response?.ok) {
-      throw new Error(response?.error || '不明なエラー');
+      throw new Error(response?.error || 'Unknown error');
     }
   } catch (error) {
     document.getElementById('issue-create-status').textContent =
-      `新規作成画面を開けませんでした: ${error.message}`;
+      `Could not open the creation form: ${error.message}`;
   }
 }
 
@@ -70,6 +70,6 @@ document.getElementById('link-countermeasure').addEventListener('click', () => {
 document.getElementById('open-extension-settings').addEventListener('click', () => {
   chrome.runtime.openOptionsPage().catch((error) => {
     document.getElementById('pat-status').textContent =
-      `拡張機能の設定を開けませんでした: ${error.message}`;
+      `Could not open extension settings: ${error.message}`;
   });
 });
