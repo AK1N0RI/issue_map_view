@@ -7,6 +7,8 @@ import {
   buildIssueCreateUrl,
   buildIssueCreateApiRequest,
   addAnalysisIssueReference,
+  getAnalysisIssueNumbers,
+  updateAnalysisIssueReferences,
   groupCountermeasuresByAnalysis,
   buildIssueListUrl,
   deriveCountermeasureStatus,
@@ -252,6 +254,20 @@ test('addAnalysisIssueReference adds the related analysis issue to a countermeas
 test('addAnalysisIssueReference leaves unassociated countermeasure bodies unchanged', () => {
   const body = '### countermeasure\n* Content: replace bearing';
   assert.equal(addAnalysisIssueReference(body, null), body);
+});
+
+test('updateAnalysisIssueReferences appends links once and writes issue numbers in ascending order', () => {
+  assert.equal(
+    updateAnalysisIssueReferences(
+      '### countermeasure\n* Content: replace bearing\n\nRelated analysis result: #4; #2',
+      [8, 2]
+    ),
+    '### countermeasure\n* Content: replace bearing\n\nRelated analysis result: #2, #4, #8'
+  );
+  assert.deepEqual(
+    getAnalysisIssueNumbers('Related analysis result: #2, #4; #8'),
+    [2, 4, 8]
+  );
 });
 
 test('groupCountermeasuresByAnalysis maps one analysis issue to multiple countermeasures', () => {

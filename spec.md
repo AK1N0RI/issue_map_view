@@ -36,6 +36,7 @@
 * 三行目以降はGitHub Issue本文の内容を表示します。Analysis Resultの列は、analysis result見出し内の箇条書きや書式付きフィールドを各セルに表示し、Failure Modeが本文にない場合はIssueタイトルを表示します。Countermeasureの列も同様に本文から値を取得し、Contentがない場合はIssueタイトルを表示します。
 * Analysis Result Number列とCountermeasure Number列にそれぞれ該当するIssue番号をリンクとして表示し、クリックすると画面遷移せずにドロワーを開きます。ドロワーにはIssueタイトル・本文、ラベル、Assignee、Projects v2、マイルストーン、変更履歴を表示します。タイトル・本文・ラベル・Assignee・Projects v2・マイルストーンは編集して保存できます。
 * Countermeasureは本文に記載された `Related analysis result:` の後のIssue番号を使ってAnalysis Resultに紐づけ、Issue番号順などの位置による紐付けはしません。Issue番号はカンマ・セミコロン・空白・ハイフンで区切って複数記載できます。一つのCountermeasureが複数のAnalysis Resultを参照する場合、そのCountermeasureを各Analysis Resultの行に表示します。一つのAnalysis Resultに複数のCountermeasureを表示できます。紐付け情報がない、または参照先のAnalysis Resultが一つも存在しないCountermeasureは、Analysis Result欄を空にして独立した行に表示します。
+* Issue Map上の「リンク」ボタンを押すとGitHub標準のデザインに沿ったドロワーを表示し、ラベル `countermeasure` を持つIssueを一覧表示します。リンク先のAnalysis ResultとCountermeasureを選択して「選択したCountermeasureをリンク」を押すと、選択したCountermeasureの本文にAnalysis ResultのIssue番号を保存します。既存のリンクを保持して重複番号を除き、複数の番号はIssue番号の昇順で `Related analysis result: #2, #4` の形式にします。行内のリンクボタンから開いた場合は、その行のAnalysis Resultをリンク先として初期選択します。
 
 ### 解析結果
 * 解析結果の一つの要素はgithub issueの一つのissueです。analysis_resultというラベルをつけることで、解析結果の列に表示されます。
@@ -75,7 +76,7 @@
 * 解析結果または対策のどちらか一方に複数Issueがあり、もう一方の行が不足する場合、不足している各行に「新規作成」ボタンを表示します。
 * Issue Mapには手動更新ボタンを表示せず、Issue作成・編集後に一覧を自動更新します。Issue一覧は、Fine-grained PATを使ってGitHub REST APIから取得し、analysis_resultおよびcountermeasureラベルを持つIssueを分類します。Issue一覧の取得に失敗した場合も、エラー表示とあわせて上部の新規作成ボタンを表示します。PR状態を取得できない場合もIssue内容は表示し、Status欄を「確認不可」とします。
 * 新規作成をクリックすると、ドロワーにIssue作成フォームを表示します。タイトルと本文を編集し、GitHub REST API経由でIssueを作成します。解析結果の列の場合はanalysis_result、対策の列の場合はcountermeasureというラベルがついたissueが作成されます。作成後は画面遷移せずに完了表示を行います。API認証には、対象リポジトリのIssues: Read and write権限を持つFine-grained PATを使用し、ブラウザーセッション中のみ保存します。
-* リンクをクリックすると、githubのissue一覧画面に遷移します。解析結果の列の場合は、analysis_resultというラベルがついたGithub issueの一覧が表示されます。対策の列の場合は、countermeasureというラベルがついたGithub issueの一覧が表示されます。
+* Issue Map上の「リンク」ボタンはGitHubのIssue一覧へ遷移せず、Issue間の紐付けを行うドロワーを表示します。
 
 
 ### 解析結果issueの作成

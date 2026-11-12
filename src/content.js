@@ -207,6 +207,178 @@ async function openIssueCreateDrawer(type, relatedAnalysisIssue = null) {
   renderIssueCreateForm(content, utilities, repoContext, type, relatedAnalysisIssue);
 }
 
+async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
+  closeIssueCreateDrawer();
+  const backdrop = document.createElement('div');
+  backdrop.style.cssText = 'position: fixed; inset: 0; z-index: 9999; display: flex; justify-content: flex-end; background: rgba(31, 35, 40, 0.24);';
+  const drawer = document.createElement('section');
+  drawer.setAttribute('role', 'dialog');
+  drawer.setAttribute('aria-modal', 'true');
+  drawer.setAttribute('aria-label', 'CountermeasureをAnalysis Resultにリンク');
+  drawer.style.cssText = 'display: flex; flex-direction: column; width: min(640px, 100vw); height: 100%; overflow: hidden; color: var(--fgColor-default, #1f2328); background: var(--bgColor-default, #fff); box-shadow: -8px 0 24px rgba(31, 35, 40, 0.2);';
+
+  const header = document.createElement('header');
+  header.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--borderColor-default, #d1d9e0);';
+  const title = document.createElement('h2');
+  title.textContent = 'Countermeasureをリンク';
+  title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 600;';
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.textContent = '閉じる';
+  closeButton.className = 'btn btn-sm';
+  header.append(title, closeButton);
+
+  const content = document.createElement('div');
+  content.style.cssText = 'flex: 1; overflow: auto; padding: 16px;';
+  const loadingMessage = document.createElement('p');
+  loadingMessage.textContent = 'Countermeasureを読み込み中...';
+  loadingMessage.setAttribute('role', 'status');
+  content.appendChild(loadingMessage);
+  drawer.append(header, content);
+  backdrop.appendChild(drawer);
+
+  const previousOverflow = document.body.style.overflow;
+  activeIssueCreateDrawer = { backdrop, previousOverflow, returnFocus: document.activeElement };
+  document.body.style.overflow = 'hidden';
+  document.body.appendChild(backdrop);
+  closeButton.addEventListener('click', closeIssueCreateDrawer);
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) {
+      closeIssueCreateDrawer();
+    }
+  });
+  drawer.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeIssueCreateDrawer();
+    }
+  });
+  closeButton.focus();
+
+  try {
+    const [utilities, issueData] = await Promise.all([
+      issueMapUtilities,
+      fetchIssueMapData(repoContext),
+    ]);
+    const analysisIssues = issueData.analysisIssues || [];
+    const countermeasureIssues = issueData.countermeasureIssues || [];
+
+    const form = document.createElement('form');
+    form.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+    const analysisLabel = document.createElement('label');
+    analysisLabel.textContent = 'リンク先のAnalysis Result';
+    analysisLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
+    const analysisSelect = document.createElement('select');
+    analysisSelect.className = 'form-control';
+    analysisSelect.setAttribute('aria-label', 'リンク先のAnalysis Result');
+    if (analysisIssues.length === 0) {
+      const emptyAnalysisOption = document.createElement('option');
+      emptyAnalysisOption.value = '';
+      emptyAnalysisOption.textContent = 'Analysis Resultがありません';
+      emptyAnalysisOption.selected = true;
+      analysisSelect.appendChild(emptyAnalysisOption);
+      analysisSelect.disabled = true;
+    }
+    for (const analysisIssue of analysisIssues) {
+      const option = document.createElement('option');
+      option.value = String(analysisIssue.number);
+      option.textContent = `#${analysisIssue.number} ${analysisIssue.title}`;
+      option.selected = analysisIssue.number === relatedAnalysisIssue?.number;
+      analysisSelect.appendChild(option);
+    }
+    if (relatedAnalysisIssue
+      && !analysisIssues.some((analysisIssue) => analysisIssue.number === relatedAnalysisIssue.number)) {
+      const option = document.createElement('option');
+      option.value = String(relatedAnalysisIssue.number);
+      option.textContent = `#${relatedAnalysisIssue.number} ${relatedAnalysisIssue.title}`;
+      option.selected = true;
+      analysisSelect.appendChild(option);
+    }
+    analysisLabel.appendChild(analysisSelect);
+
+    const linkButton = document.createElement('button');
+    linkButton.type = 'submit';
+    linkButton.textContent = '選択したCountermeasureをリンク';
+    linkButton.className = 'btn btn-primary';
+    linkButton.style.cssText = 'align-self: flex-start;';
+    linkButton.disabled = analysisIssues.length === 0;
+    const status = document.createElement('p');
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    const countermeasureList = document.createElement('div');
+    countermeasureList.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
+    if (countermeasureIssues.length === 0) {
+      const emptyCountermeasures = document.createElement('p');
+      emptyCountermeasures.textContent = 'ラベル「countermeasure」のIssueはありません。';
+      emptyCountermeasures.className = 'text-small color-fg-muted';
+      countermeasureList.appendChild(emptyCountermeasures);
+      linkButton.disabled = true;
+    } else {
+      for (const issue of countermeasureIssues) {
+        const label = document.createElement('label');
+        label.style.cssText = 'display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); border-radius: 6px; font-weight: 400;';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'countermeasureIssue';
+        checkbox.value = String(issue.number);
+        checkbox.setAttribute('aria-label', `Countermeasure #${issue.number} ${issue.title}`);
+        const description = document.createElement('span');
+        const issueTitle = document.createElement('span');
+        issueTitle.textContent = `#${issue.number} ${issue.title}`;
+        issueTitle.style.fontWeight = '600';
+        const currentReferences = utilities.getAnalysisIssueNumbers(issue.body)
+          .map((number) => `#${number}`).join(', ');
+        const existingLinks = document.createElement('small');
+        existingLinks.className = 'color-fg-muted';
+        existingLinks.textContent = currentReferences
+          ? `現在のリンク: ${currentReferences}`
+          : '現在のリンク: なし';
+        description.append(issueTitle, document.createElement('br'), existingLinks);
+        label.append(checkbox, description);
+        countermeasureList.appendChild(label);
+      }
+    }
+    form.append(analysisLabel, linkButton, status, countermeasureList);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const selectedIssueNumbers = [...form.querySelectorAll('input[name="countermeasureIssue"]:checked')]
+        .map((input) => Number(input.value));
+      if (selectedIssueNumbers.length === 0) {
+        status.textContent = 'リンクするCountermeasureを選択してください。';
+        return;
+      }
+      if (!analysisSelect.value) {
+        status.textContent = 'リンク先のAnalysis Resultを選択してください。';
+        return;
+      }
+      linkButton.disabled = true;
+      status.textContent = 'リンクを保存中...';
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'LINK_COUNTERMEASURE_ISSUES',
+          ...repoContext,
+          analysisIssueNumber: Number(analysisSelect.value),
+          countermeasureIssueNumbers: selectedIssueNumbers,
+        });
+        if (!response?.ok) {
+          throw new Error(response?.error || 'Issueのリンクを保存できませんでした');
+        }
+        status.textContent = `Countermeasure #${response.linkedIssueNumbers.join(', #')} をAnalysis Result #${response.analysisIssueNumber}にリンクしました。`;
+        issueMapPageState?.page.loadIssues();
+      } catch (error) {
+        status.textContent = `リンクに失敗しました: ${error.message}`;
+      } finally {
+        linkButton.disabled = false;
+      }
+    });
+    content.replaceChildren(form);
+  } catch (error) {
+    const errorMessage = document.createElement('p');
+    errorMessage.textContent = `Countermeasureを表示できませんでした: ${error.message}`;
+    errorMessage.setAttribute('role', 'alert');
+    content.replaceChildren(errorMessage);
+  }
+}
+
 async function openIssueDetailsDrawer(issue) {
   const repoContext = getRepositoryContext();
   if (!repoContext) {
@@ -616,6 +788,16 @@ function createIssueMapPage() {
     });
   };
 
+  const bindIssueLinkButton = (button, relatedAnalysisIssue = null) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openIssueLinkDrawer(repoContext, relatedAnalysisIssue).catch((error) => {
+        statusMessage.textContent = `リンク画面を開けませんでした: ${error.message}`;
+      });
+    });
+  };
+
   const tableWrapper = document.createElement('div');
   tableWrapper.style.cssText = 'overflow-x: auto; border: 1px solid var(--borderColor-default, #d1d9e0); border-radius: 6px; background-color: var(--bgColor-default, #fff);';
   const table = document.createElement('table');
@@ -693,6 +875,7 @@ function createIssueMapPage() {
       listButton.className = 'btn btn-sm';
       listButton.href = utilities.buildIssueListUrl({ ...repoContext, type });
       listButton.style.fontSize = '9.33px';
+      bindIssueLinkButton(listButton);
       cell.append(message, createButton, listButton);
       row.appendChild(cell);
     };
@@ -738,6 +921,7 @@ function createIssueMapPage() {
     listButton.className = 'btn btn-sm';
     listButton.href = utilities.buildIssueListUrl({ ...repoContext, type });
     listButton.style.fontSize = '9.33px';
+    bindIssueLinkButton(listButton, relatedAnalysisIssue);
     cell.append(text, createButton, listButton);
     return cell;
   };

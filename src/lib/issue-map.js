@@ -162,10 +162,34 @@ function addAnalysisIssueReference(body, issueNumber) {
   if (issueNumber == null) {
     return body;
   }
-  if (!Number.isInteger(issueNumber) || issueNumber < 1) {
+  return updateAnalysisIssueReferences(body, [issueNumber]);
+}
+
+function getAnalysisIssueNumbers(body) {
+  const references = [...String(body || '').matchAll(
+    /^[ \t]*(?:[-*+][ \t]*)?(?:related[ \t]+)?analysis[ \t_-]*result(?:[ \t]+issue)?(?:[ \t]+number)?[ \t]*:[ \t]*([^\r\n]*)$/gim
+  )];
+  return [...new Set(
+    references.flatMap((reference) => [...reference[1].matchAll(/#?(\d+)/g)]
+      .map((numberMatch) => Number(numberMatch[1])))
+  )];
+}
+
+function updateAnalysisIssueReferences(body, issueNumbers) {
+  if (!Array.isArray(issueNumbers)
+    || issueNumbers.some((number) => !Number.isInteger(number) || number < 1)) {
     throw new Error('Analysis Result Issue番号が不正です');
   }
-  return `${body.trimEnd()}\n\nRelated analysis result: #${issueNumber}`;
+  const lines = String(body || '').split(/\r?\n/);
+  const existingReferences = getAnalysisIssueNumbers(body);
+  const referenceLine = /^[ \t]*(?:[-*+][ \t]*)?(?:related[ \t]+)?analysis[ \t_-]*result(?:[ \t]+issue)?(?:[ \t]+number)?[ \t]*:[ \t]*[^\r\n]*$/i;
+  const content = lines.filter((line) => !referenceLine.test(line)).join('\n').trimEnd();
+  const allIssueNumbers = [...new Set([...existingReferences, ...issueNumbers])].sort((a, b) => a - b);
+  if (allIssueNumbers.length === 0) {
+    return content;
+  }
+  const reference = `Related analysis result: ${allIssueNumbers.map((number) => `#${number}`).join(', ')}`;
+  return `${content}${content ? '\n\n' : ''}${reference}`;
 }
 
 function groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues) {
@@ -176,14 +200,7 @@ function groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues) {
   const unlinkedCountermeasures = [];
 
   for (const issue of countermeasureIssues) {
-    const references = [...(issue.body || '').matchAll(
-      /^[ \t]*(?:[-*+][ \t]*)?(?:related[ \t]+)?analysis[ \t_-]*result(?:[ \t]+issue)?(?:[ \t]+number)?[ \t]*:[ \t]*([^\r\n]*)$/gim
-    )];
-    const analysisNumbers = new Set(
-      references.flatMap((reference) => [...reference[1].matchAll(/#?(\d+)/g)]
-        .map((numberMatch) => Number(numberMatch[1])))
-    );
-    const associatedAnalysisNumbers = [...analysisNumbers]
+    const associatedAnalysisNumbers = getAnalysisIssueNumbers(issue.body)
       .filter((number) => analysisByNumber.has(number));
     if (associatedAnalysisNumbers.length === 0) {
       unlinkedCountermeasures.push(issue);
@@ -236,6 +253,8 @@ export {
   buildIssueCreateUrl,
   buildIssueCreateApiRequest,
   addAnalysisIssueReference,
+  getAnalysisIssueNumbers,
+  updateAnalysisIssueReferences,
   groupCountermeasuresByAnalysis,
   buildIssueListUrl,
   deriveCountermeasureStatus,

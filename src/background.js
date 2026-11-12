@@ -2,6 +2,7 @@ import {
   buildIssueCreateApiRequest,
   buildIssueCreateUrl,
   buildIssueListUrl,
+  updateAnalysisIssueReferences,
 } from './lib/issue-map.js';
 
 const GITHUB_ISSUE_TYPE = {
@@ -352,6 +353,72 @@ async function updateIssueDetails(message) {
   return { issueUrl: issue.html_url };
 }
 
+async function linkCountermeasureIssues(message) {
+  if (!isValidRepoSegment(message.owner) || !isValidRepoSegment(message.repo)
+    || !Number.isInteger(message.analysisIssueNumber) || message.analysisIssueNumber < 1
+    || !Array.isArray(message.countermeasureIssueNumbers)
+    || message.countermeasureIssueNumbers.length === 0
+    || message.countermeasureIssueNumbers.some((number) => !Number.isInteger(number) || number < 1)) {
+    throw new Error('Issueの紐付け情報が不正です');
+  }
+  const countermeasureIssueNumbers = [...new Set(message.countermeasureIssueNumbers)];
+  const githubPat = await getGitHubPat();
+  const baseUrl = `https://api.github.com/repos/${encodeURIComponent(message.owner)}/${encodeURIComponent(message.repo)}/issues`;
+  const { data: analysisIssue } = await fetchGitHubApi(
+    `${baseUrl}/${message.analysisIssueNumber}`,
+    githubPat
+  );
+  if (analysisIssue.pull_request || !analysisIssue.labels?.some(
+    (label) => label.name?.toLowerCase() === GITHUB_ISSUE_TYPE.ANALYSIS_RESULT
+  )) {
+    throw new Error(`Issue #${message.analysisIssueNumber} はAnalysis Resultではありません`);
+  }
+
+  const linkedIssueNumbers = [];
+  for (const issueNumber of countermeasureIssueNumbers) {
+    try {
+      const { data: issue } = await fetchGitHubApi(`${baseUrl}/${issueNumber}`, githubPat);
+      if (issue.pull_request || !issue.labels?.some(
+        (label) => label.name?.toLowerCase() === GITHUB_ISSUE_TYPE.COUNTERMEASURE
+      )) {
+        throw new Error(`Issue #${issueNumber} はCountermeasureではありません`);
+      }
+
+      const body = updateAnalysisIssueReferences(issue.body || '', [message.analysisIssueNumber]);
+      if (body !== (issue.body || '')) {
+        const response = await fetch(`${baseUrl}/${issueNumber}`, {
+          method: 'PATCH',
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${githubPat}`,
+            'Content-Type': 'application/json',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+          body: JSON.stringify({ body }),
+        });
+        let result;
+        try {
+          result = await response.json();
+        } catch {
+          throw new Error(`GitHub APIから有効な応答がありませんでした (${response.status})`);
+        }
+        if (!response.ok) {
+          throw new Error(result.message || `Issue #${issueNumber} を更新できませんでした (${response.status})`);
+        }
+      }
+      linkedIssueNumbers.push(issueNumber);
+    } catch (error) {
+      if (linkedIssueNumbers.length > 0) {
+        throw new Error(
+          `一部の紐付けを保存しました（#${linkedIssueNumbers.join(', #')}）。Issue #${issueNumber} で失敗: ${error.message}`
+        );
+      }
+      throw error;
+    }
+  }
+  return { linkedIssueNumbers, analysisIssueNumber: message.analysisIssueNumber };
+}
+
 async function checkGitHubPat() {
   const { githubPat } = await chrome.storage.session.get('githubPat');
   if (typeof githubPat !== 'string' || !githubPat) {
@@ -472,6 +539,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'UPDATE_ISSUE_DETAILS') {
     updateIssueDetails(message)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
+  if (message.type === 'LINK_COUNTERMEASURE_ISSUES') {
+    linkCountermeasureIssues(message)
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
