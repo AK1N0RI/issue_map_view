@@ -7,6 +7,7 @@ Issue Map View is a Chrome extension for GitHub repositories that visualizes FME
 - Adds an Issues Map panel to repository pages
 - Uses `analysis_result` and `countermeasure` issue labels
 - Opens issue creation and Countermeasure-to-Analysis Result linking drawers from blank cells
+- Caches Issue Map data for faster return navigation and updates the cache after edits
 - Supports the spec-defined FMEA workflow for analysis and remedy tracking
 
 ## Structure

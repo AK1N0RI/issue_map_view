@@ -9,6 +9,9 @@ const GITHUB_ISSUE_TYPE = {
   ANALYSIS_RESULT: 'analysis_result',
   COUNTERMEASURE: 'countermeasure',
 };
+const ISSUE_MAP_CACHE_PREFIX = 'issueMapData:';
+const ISSUE_MAP_CACHE_TTL_MS = 5 * 60 * 1000;
+const issueMapDataRequests = new Map();
 
 function isValidRepoSegment(value) {
   return typeof value === 'string'
@@ -24,6 +27,84 @@ async function getGitHubPat() {
   }
   return githubPat;
 }
+
+function getIssueMapCacheKey(owner, repo) {
+  return `${ISSUE_MAP_CACHE_PREFIX}${owner}/${repo}`;
+}
+
+async function storeIssueMapDataCache(key, data) {
+  try {
+    await chrome.storage.session.set({
+      [key]: {
+        data,
+        expiresAt: Date.now() + ISSUE_MAP_CACHE_TTL_MS,
+      },
+    });
+  } catch (error) {
+    console.error('Issue Mapの一時キャッシュを保存できませんでした', error);
+  }
+}
+
+async function updateCachedIssueMapData(owner, repo, updater) {
+  const key = getIssueMapCacheKey(owner, repo);
+  const cached = (await chrome.storage.session.get(key))[key];
+  if (!cached?.data) {
+    return;
+  }
+  const data = updater(cached.data);
+  await storeIssueMapDataCache(key, data);
+}
+
+async function cacheCreatedIssue(owner, repo, issueType, issue) {
+  await updateCachedIssueMapData(owner, repo, (data) => {
+    const target = issueType === GITHUB_ISSUE_TYPE.ANALYSIS_RESULT
+      ? 'analysisIssues'
+      : 'countermeasureIssues';
+    const issues = (data[target] || []).filter((item) => item.number !== issue.number);
+    issues.push(issueType === GITHUB_ISSUE_TYPE.COUNTERMEASURE
+      ? { ...issue, countermeasureStatus: '未着手' }
+      : issue);
+    return { ...data, [target]: issues };
+  });
+}
+
+async function updateCachedIssue(owner, repo, issueNumber, issue) {
+  await updateCachedIssueMapData(owner, repo, (data) => {
+    const existing = [
+      ...(data.analysisIssues || []),
+      ...(data.countermeasureIssues || []),
+    ].find((item) => item.number === issueNumber);
+    const updatedIssue = { ...existing, ...issue };
+    const hasLabel = (label) => updatedIssue.labels?.some(
+      (issueLabel) => issueLabel.name?.toLowerCase() === label
+    );
+    const analysisIssues = (data.analysisIssues || [])
+      .filter((item) => item.number !== issueNumber);
+    const countermeasureIssues = (data.countermeasureIssues || [])
+      .filter((item) => item.number !== issueNumber);
+    if (hasLabel(GITHUB_ISSUE_TYPE.ANALYSIS_RESULT)) {
+      analysisIssues.push(updatedIssue);
+    }
+    if (hasLabel(GITHUB_ISSUE_TYPE.COUNTERMEASURE)) {
+      countermeasureIssues.push({
+        ...updatedIssue,
+        countermeasureStatus: existing?.countermeasureStatus || '未着手',
+      });
+    }
+    return { analysisIssues, countermeasureIssues };
+  });
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'session' || !changes.githubPat) {
+    return;
+  }
+  chrome.storage.session.get(null)
+    .then((items) => Object.keys(items)
+      .filter((key) => key.startsWith(ISSUE_MAP_CACHE_PREFIX)))
+    .then((keys) => (keys.length > 0 ? chrome.storage.session.remove(keys) : undefined))
+    .catch((error) => console.error('Issue Mapキャッシュを削除できませんでした', error));
+});
 
 async function fetchGitHubApi(url, githubPat) {
   const apiUrl = new URL(url);
@@ -188,6 +269,26 @@ async function fetchIssueMapData(message) {
   if (!isValidRepoSegment(message.owner) || !isValidRepoSegment(message.repo)) {
     throw new Error('リポジトリ情報が不正です');
   }
+  const cacheKey = getIssueMapCacheKey(message.owner, message.repo);
+  const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
+  if (cached?.expiresAt > Date.now()) {
+    return cached.data;
+  }
+  const pendingRequest = issueMapDataRequests.get(cacheKey);
+  if (pendingRequest) {
+    return pendingRequest;
+  }
+  const request = fetchFreshIssueMapData(message)
+    .then(async (data) => {
+      await storeIssueMapDataCache(cacheKey, data);
+      return data;
+    })
+    .finally(() => issueMapDataRequests.delete(cacheKey));
+  issueMapDataRequests.set(cacheKey, request);
+  return request;
+}
+
+async function fetchFreshIssueMapData(message) {
   const githubPat = await getGitHubPat();
   const issues = await fetchRepositoryIssues(message.owner, message.repo, githubPat);
   const hasLabel = (issue, label) => Array.isArray(issue.labels) && issue.labels.some(
@@ -197,7 +298,7 @@ async function fetchIssueMapData(message) {
   const rawCountermeasureIssues = issues.filter((issue) => hasLabel(issue, GITHUB_ISSUE_TYPE.COUNTERMEASURE));
   const countermeasureIssues = await mapWithConcurrency(
     rawCountermeasureIssues,
-    4,
+    8,
     (issue) => getLinkedPullRequest(issue, message.owner, message.repo, githubPat)
   );
   return { analysisIssues, countermeasureIssues };
@@ -293,6 +394,7 @@ async function updateIssueDetails(message) {
   if (!issueResponse.ok) {
     throw new Error(issue.message || `Issueを更新できませんでした (${issueResponse.status})`);
   }
+  await updateCachedIssue(message.owner, message.repo, message.issueNumber, issue);
 
   if (message.projectIds === null) {
     return { issueUrl: issue.html_url, projectsUpdated: false };
@@ -385,6 +487,7 @@ async function linkCountermeasureIssues(message) {
       }
 
       const body = updateAnalysisIssueReferences(issue.body || '', [message.analysisIssueNumber]);
+      let updatedIssue = issue;
       if (body !== (issue.body || '')) {
         const response = await fetch(`${baseUrl}/${issueNumber}`, {
           method: 'PATCH',
@@ -405,7 +508,9 @@ async function linkCountermeasureIssues(message) {
         if (!response.ok) {
           throw new Error(result.message || `Issue #${issueNumber} を更新できませんでした (${response.status})`);
         }
+        updatedIssue = result;
       }
+      await updateCachedIssue(message.owner, message.repo, issueNumber, updatedIssue);
       linkedIssueNumbers.push(issueNumber);
     } catch (error) {
       if (linkedIssueNumbers.length > 0) {
@@ -490,6 +595,7 @@ async function createIssue(message) {
   if (typeof result.html_url !== 'string' || !Number.isInteger(result.number)) {
     throw new Error('GitHub APIの応答にIssue情報がありません');
   }
+  await cacheCreatedIssue(message.owner, message.repo, message.issueType, result);
   return { issueUrl: result.html_url, issueNumber: result.number };
 }
 

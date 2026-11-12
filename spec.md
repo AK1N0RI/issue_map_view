@@ -74,7 +74,7 @@
 * ブランクのボックスには新規作成と、リンクの二つのボタンがあります。
 * Issueの有無にかかわらず、画面上部に解析結果と対策それぞれの「新規作成」ボタンを表示します。
 * 解析結果または対策のどちらか一方に複数Issueがあり、もう一方の行が不足する場合、不足している各行に「新規作成」ボタンを表示します。
-* Issue Mapには手動更新ボタンを表示せず、Issue作成・編集後に一覧を自動更新します。Issue一覧は、Fine-grained PATを使ってGitHub REST APIから取得し、analysis_resultおよびcountermeasureラベルを持つIssueを分類します。Issue一覧の取得に失敗した場合も、エラー表示とあわせて上部の新規作成ボタンを表示します。PR状態を取得できない場合もIssue内容は表示し、Status欄を「確認不可」とします。
+* Issue Mapには手動更新ボタンを表示せず、Issue作成・編集後に一覧を自動更新します。Issue一覧はFine-grained PATを使ってGitHub REST APIから取得し、analysis_resultおよびcountermeasureラベルを持つIssueを分類します。一覧はブラウザーセッション内で5分間キャッシュし、Issue Mapへ戻った際に再利用します。Issue作成・編集・紐付け後はキャッシュを更新して変更を直ちに表示します。PR状態の取得は並列化し、完了を待つ時間を短縮します。Issue一覧の取得に失敗した場合も、エラー表示とあわせて上部の新規作成ボタンを表示します。PR状態を取得できない場合もIssue内容は表示し、Status欄を「確認不可」とします。
 * 新規作成をクリックすると、ドロワーにIssue作成フォームを表示します。タイトルと本文を編集し、GitHub REST API経由でIssueを作成します。解析結果の列の場合はanalysis_result、対策の列の場合はcountermeasureというラベルがついたissueが作成されます。作成後は画面遷移せずに完了表示を行います。API認証には、対象リポジトリのIssues: Read and write権限を持つFine-grained PATを使用し、ブラウザーセッション中のみ保存します。
 * Issue Map上の「リンク」ボタンはGitHubのIssue一覧へ遷移せず、Issue間の紐付けを行うドロワーを表示します。
 
