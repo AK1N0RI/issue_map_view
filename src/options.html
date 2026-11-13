@@ -48,7 +48,13 @@
   </head>
   <body>
     <h1>Issue Map View Settings</h1>
-    <p class="help">Configure a fine-grained personal access token (PAT). The token requires access to the target repository and Issues: Read and write permission. Pull requests: Read permission is required to check the status of pull requests linked to countermeasures. Projects: Read and write permission is required to view and edit Project v2 membership. The token is stored only for the current browser session and is removed when the browser session ends or the extension is reloaded.</p>
+    <p class="help">Configure a fine-grained personal access token (PAT) with access to the target repository. Grant these repository permissions:</p>
+    <ul class="help">
+      <li><strong>Issues: Read and write</strong> — list, create, update, and link Analysis Result and Countermeasure issues.</li>
+      <li><strong>Pull requests: Read and write</strong> — list pull requests and add issue references to their descriptions.</li>
+      <li><strong>Projects: Read and write</strong> — view and edit Project v2 membership.</li>
+    </ul>
+    <p class="help">The token is stored only for the current browser session and is removed when the browser session ends or the extension is reloaded.</p>
 
     <label for="github-pat">GitHub Fine-grained PAT</label>
     <input

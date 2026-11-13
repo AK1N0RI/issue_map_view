@@ -17,12 +17,15 @@ Items marked with `*` describe external behavior. Items marked with `**` describ
 
 ## Issue Map
 
-* Display Analysis Results and Countermeasures in a spreadsheet-like table styled like GitHub's issue pages, with approximately two-thirds of their font size.
-* The first row contains the columns "Analysis Result Number", "Analysis Result", "Countermeasure Number", and "Countermeasure".
-* The second row contains field headings. Analysis Result fields are "Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", and "Detection". Countermeasure fields are "Content", "Effect(Effect)", "Effect(Occurrence)", "Effect(Detection)", "RPN", "Status", "Owner", and "Deadline".
+* Display Analysis Results, Countermeasures, and pull requests in a spreadsheet-like table styled like GitHub's issue pages, with approximately two-thirds of their font size.
+* The first row contains the columns "Analysis Result Number", "Analysis Result", "Countermeasure Number", "Countermeasure", and "PR".
+* The second row contains field headings. Analysis Result fields are "Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", and "Detection". Countermeasure fields are "Content", "Effect(Effect)", "Effect(Occurrence)", "Effect(Detection)", and "RPN".
 * Starting with the third row, cells display values parsed from each GitHub issue body. If the Analysis Result's Failure Mode or Countermeasure's Content is missing, display the issue title instead.
 * Display each issue number as a link. Selecting it opens the issue drawer without navigating away. The drawer displays the title, body, labels, assignees, Projects v2, milestone, and change history. The title, body, labels, assignees, Projects v2, and milestone can be edited and saved.
 * Link Countermeasures to Analysis Results using issue numbers in the Countermeasure body after `Related analysis result:`. Do not infer relationships from issue number order or row position. Multiple issue numbers may be separated by commas, semicolons, spaces, or hyphens. Display a Countermeasure in the row of every referenced Analysis Result. Multiple Countermeasures may link to one Analysis Result. Countermeasures with no valid existing references appear in standalone rows with an empty Analysis Result cell.
+* Associate PRs with issues by explicit relationship references in the PR body, such as `Closes #2`, `Fixes #2`, `Resolves #2`, or `Related to #3`. Multiple references can appear on one line. Ignore unrelated `#<number>` mentions and explicitly qualified references to other repositories. A PR can reference multiple Analysis Results and Countermeasures. Display one row for every Analysis Result–Countermeasure–PR combination referenced by the PR, repeating each issue and PR as necessary. Preserve the existing Analysis Result-to-Countermeasure relationship when no PR reference is present.
+* Display this warning above the Issue Map: "Countermeasures and PRs are expected to have a 1:1 relationship. A PR linked to multiple Countermeasures is repeated for each Analysis Result–Countermeasure combination."
+* The PR column displays a link to each associated PR. Empty PR cells provide "Create new" and "Link" actions. "Create new" opens GitHub's compare page in a new tab. "Link" opens a drawer where users select an existing PR and one or more Analysis Results and Countermeasures; save the selections by appending `Related to #<number>` references to the PR body, preserving existing references.
 * The "Link" button opens a GitHub-styled drawer listing issues labeled `countermeasure`. Select the Analysis Result and one or more Countermeasures, then choose "Link selected countermeasures" to save the Analysis Result issue number in each selected Countermeasure body. Preserve existing links, remove duplicates, and sort numbers in ascending order using the format `Related analysis result: #2, #4`. When opened from a row, preselect that row's Analysis Result.
 
 ### Analysis Results
@@ -47,8 +50,7 @@ Items marked with `*` describe external behavior. Items marked with `**` describ
 
 ### Countermeasures
 
-* Countermeasure rows display the issue number, fields from the `countermeasure` section, and the status of linked pull requests.
-* A merged linked pull request sets Status to "Complete"; an unmerged pull request sets it to "In progress"; no linked pull request sets it to "Not started". If the status cannot be retrieved, keep the issue visible and display "Unavailable".
+* Countermeasure rows display the issue number and fields from the `countermeasure` section. Do not display Status, Owner, or Deadline fields.
 * Countermeasure issues use a `### countermeasure` heading and fields such as:
 
 ```markdown
@@ -58,9 +60,6 @@ Items marked with `*` describe external behavior. Items marked with `**` describ
 * Effect(Occurrence): 7
 * Effect(Detection): 3
 * RPN: 189
-* Status:
-* Owner:
-* Deadline:
 ```
 
 ### Listing and issue actions
@@ -68,9 +67,10 @@ Items marked with `*` describe external behavior. Items marked with `**` describ
 * Initially, both Analysis Result and Countermeasure columns are visible and empty. Empty cells provide "Create new" and "Link" actions.
 * Display a top-level "Create new" button for each issue type regardless of whether matching issues already exist.
 * If one issue type has more issues than the other, show a "Create new" action in each unmatched row.
-* Do not show a manual refresh button. Fetch issues from the GitHub REST API with a fine-grained PAT and categorize them by the `analysis_result` and `countermeasure` labels. Cache results for five minutes in the browser session and reuse them when returning to the Issue Map. Update the cache after issue creation, editing, and linking so changes appear immediately. Fetch pull request statuses concurrently to reduce latency. If listing issues fails, show the error and keep the top-level creation buttons available.
+* Do not show a manual refresh button. Fetch issues and pull requests from the GitHub REST API with a fine-grained PAT and categorize issues by the `analysis_result` and `countermeasure` labels. Cache issues for five minutes in the browser session, but fetch pull requests when loading the map and again when returning to its browser tab so edited PR references are reflected promptly. Update the cache after issue creation, editing, and linking so changes appear immediately. If listing issues or pull requests fails, show the error and keep the top-level creation buttons available.
 * Selecting "Create new" opens an issue creation form in the drawer. The title and body are editable. Create the issue through the GitHub REST API with the appropriate label and show success without navigating away. Authenticate with a fine-grained PAT that has Issues: Read and write permission for the target repository; keep it only for the browser session.
 * The Issue Map's "Link" action opens a drawer for linking issues instead of navigating to GitHub's issue list.
+* The "Create pull request" action opens GitHub's compare page in a new tab. The "Link" action opens the PR linking drawer.
 
 ### Creating Analysis Result issues
 
@@ -105,7 +105,4 @@ Items marked with `*` describe external behavior. Items marked with `**` describ
 * Effect(Occurrence): <!-- insert countermeasure effect on occurrence -->
 * Effect(Detection): <!-- insert countermeasure effect on detection -->
 * RPN: <!-- insert countermeasure RPN -->
-* Status: <!-- insert countermeasure status -->
-* Owner: <!-- insert countermeasure owner -->
-* Deadline: <!-- insert countermeasure deadline -->
 ```

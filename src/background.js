@@ -2,6 +2,7 @@ import {
   buildIssueCreateApiRequest,
   buildIssueCreateUrl,
   buildIssueListUrl,
+  addPullRequestIssueReferences,
   updateAnalysisIssueReferences,
 } from './lib/issue-map.js';
 
@@ -61,9 +62,7 @@ async function cacheCreatedIssue(owner, repo, issueType, issue) {
       ? 'analysisIssues'
       : 'countermeasureIssues';
     const issues = (data[target] || []).filter((item) => item.number !== issue.number);
-    issues.push(issueType === GITHUB_ISSUE_TYPE.COUNTERMEASURE
-      ? { ...issue, countermeasureStatus: 'Not started' }
-      : issue);
+    issues.push(issue);
     return { ...data, [target]: issues };
   });
 }
@@ -86,10 +85,7 @@ async function updateCachedIssue(owner, repo, issueNumber, issue) {
       analysisIssues.push(updatedIssue);
     }
     if (hasLabel(GITHUB_ISSUE_TYPE.COUNTERMEASURE)) {
-      countermeasureIssues.push({
-        ...updatedIssue,
-        countermeasureStatus: existing?.countermeasureStatus || 'Not started',
-      });
+      countermeasureIssues.push(updatedIssue);
     }
     return { analysisIssues, countermeasureIssues };
   });
@@ -129,7 +125,7 @@ async function fetchGitHubApi(url, githubPat) {
       throw new Error('The PAT is invalid or expired. Configure a new PAT.');
     }
     if (response.status === 403) {
-      throw new Error('The PAT requires repository access and Issues: Read and write permission');
+      throw new Error('The PAT requires repository access, Issues: Read and write, and Pull requests: Read and write permissions');
     }
     throw new Error(data.message || `GitHub API error (${response.status})`);
   }
@@ -200,69 +196,12 @@ async function fetchRepositoryIssues(owner, repo, githubPat) {
   }
 }
 
-async function getLinkedPullRequest(issue, owner, repo, githubPat) {
-  const timelineUrl = new URL(
-    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issue.number}/timeline`
+async function fetchRepositoryPullRequests(owner, repo, githubPat) {
+  const url = new URL(
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`
   );
-  timelineUrl.searchParams.set('per_page', '100');
-  let events;
-  try {
-    ({ data: events } = await fetchGitHubApi(timelineUrl, githubPat));
-  } catch (error) {
-    return {
-      ...issue,
-      countermeasureStatus: 'Unavailable',
-      countermeasureStatusError: error.message,
-    };
-  }
-  if (!Array.isArray(events)) {
-    throw new Error(`GitHub API returned an invalid timeline for issue #${issue.number}`);
-  }
-
-  const linkedPullRequests = events
-    .filter((event) => event.event === 'cross-referenced')
-    .map((event) => event.source?.issue || event.source)
-    .filter((source) => source?.pull_request?.url);
-
-  if (linkedPullRequests.length === 0) {
-    return { ...issue, countermeasureStatus: 'Not started' };
-  }
-
-  let pullRequests;
-  try {
-    pullRequests = await Promise.all(
-      linkedPullRequests.map(async (source) => {
-        const { data } = await fetchGitHubApi(source.pull_request.url, githubPat);
-        return data;
-      })
-    );
-  } catch (error) {
-    return {
-      ...issue,
-      countermeasureStatus: 'Unavailable',
-      countermeasureStatusError: error.message,
-    };
-  }
-  return {
-    ...issue,
-    countermeasureStatus: pullRequests.some((pullRequest) => pullRequest.merged_at)
-      ? 'Complete'
-      : 'In progress',
-  };
-}
-
-async function mapWithConcurrency(items, concurrency, mapper) {
-  const results = new Array(items.length);
-  let nextIndex = 0;
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      results[index] = await mapper(items[index]);
-    }
-  });
-  await Promise.all(workers);
-  return results;
+  url.searchParams.set('state', 'all');
+  return fetchAllPages(url, githubPat);
 }
 
 async function fetchIssueMapData(message) {
@@ -271,7 +210,7 @@ async function fetchIssueMapData(message) {
   }
   const cacheKey = getIssueMapCacheKey(message.owner, message.repo);
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
-  if (cached?.expiresAt > Date.now()) {
+  if (cached?.expiresAt > Date.now() && Array.isArray(cached.data.pullRequests)) {
     return cached.data;
   }
   const pendingRequest = issueMapDataRequests.get(cacheKey);
@@ -291,17 +230,21 @@ async function fetchIssueMapData(message) {
 async function fetchFreshIssueMapData(message) {
   const githubPat = await getGitHubPat();
   const issues = await fetchRepositoryIssues(message.owner, message.repo, githubPat);
+  const pullRequests = await fetchRepositoryPullRequests(message.owner, message.repo, githubPat);
   const hasLabel = (issue, label) => Array.isArray(issue.labels) && issue.labels.some(
     (issueLabel) => typeof issueLabel.name === 'string' && issueLabel.name.toLowerCase() === label
   );
   const analysisIssues = issues.filter((issue) => hasLabel(issue, GITHUB_ISSUE_TYPE.ANALYSIS_RESULT));
-  const rawCountermeasureIssues = issues.filter((issue) => hasLabel(issue, GITHUB_ISSUE_TYPE.COUNTERMEASURE));
-  const countermeasureIssues = await mapWithConcurrency(
-    rawCountermeasureIssues,
-    8,
-    (issue) => getLinkedPullRequest(issue, message.owner, message.repo, githubPat)
-  );
-  return { analysisIssues, countermeasureIssues };
+  const countermeasureIssues = issues.filter((issue) => hasLabel(issue, GITHUB_ISSUE_TYPE.COUNTERMEASURE));
+  return { analysisIssues, countermeasureIssues, pullRequests };
+}
+
+async function fetchPullRequests(message) {
+  if (!isValidRepoSegment(message.owner) || !isValidRepoSegment(message.repo)) {
+    throw new Error('Repository information is invalid');
+  }
+  const githubPat = await getGitHubPat();
+  return fetchRepositoryPullRequests(message.owner, message.repo, githubPat);
 }
 
 async function fetchIssueDetails(message) {
@@ -524,6 +467,86 @@ async function linkCountermeasureIssues(message) {
   return { linkedIssueNumbers, analysisIssueNumber: message.analysisIssueNumber };
 }
 
+async function linkPullRequestIssues(message) {
+  const validNumbers = (numbers) => Array.isArray(numbers)
+    && numbers.length > 0
+    && numbers.every((number) => Number.isInteger(number) && number > 0);
+  if (!isValidRepoSegment(message.owner) || !isValidRepoSegment(message.repo)
+    || !Number.isInteger(message.pullRequestNumber) || message.pullRequestNumber < 1
+    || !validNumbers(message.analysisIssueNumbers)
+    || !validNumbers(message.countermeasureIssueNumbers)) {
+    throw new Error('The pull request linking data is invalid');
+  }
+
+  const analysisIssueNumbers = [...new Set(message.analysisIssueNumbers)];
+  const countermeasureIssueNumbers = [...new Set(message.countermeasureIssueNumbers)];
+  const githubPat = await getGitHubPat();
+  const baseUrl = `https://api.github.com/repos/${encodeURIComponent(message.owner)}/${encodeURIComponent(message.repo)}`;
+  const [{ data: pullRequest }, analysisResults, countermeasures] = await Promise.all([
+    fetchGitHubApi(`${baseUrl}/pulls/${message.pullRequestNumber}`, githubPat),
+    Promise.all(analysisIssueNumbers.map(async (issueNumber) => {
+      const { data: issue } = await fetchGitHubApi(`${baseUrl}/issues/${issueNumber}`, githubPat);
+      if (issue.pull_request || !issue.labels?.some(
+        (label) => label.name?.toLowerCase() === GITHUB_ISSUE_TYPE.ANALYSIS_RESULT
+      )) {
+        throw new Error(`Issue #${issueNumber} is not an analysis result`);
+      }
+      return issue;
+    })),
+    Promise.all(countermeasureIssueNumbers.map(async (issueNumber) => {
+      const { data: issue } = await fetchGitHubApi(`${baseUrl}/issues/${issueNumber}`, githubPat);
+      if (issue.pull_request || !issue.labels?.some(
+        (label) => label.name?.toLowerCase() === GITHUB_ISSUE_TYPE.COUNTERMEASURE
+      )) {
+        throw new Error(`Issue #${issueNumber} is not a countermeasure`);
+      }
+      return issue;
+    })),
+  ]);
+  if (!pullRequest.pull_request && !pullRequest.html_url) {
+    throw new Error(`Issue #${message.pullRequestNumber} is not a pull request`);
+  }
+
+  const issueNumbers = [...analysisResults, ...countermeasures].map((issue) => issue.number);
+  const body = addPullRequestIssueReferences(pullRequest.body || '', issueNumbers, {
+    owner: message.owner,
+    repo: message.repo,
+  });
+  let updatedPullRequest = pullRequest;
+  if (body !== (pullRequest.body || '')) {
+    const response = await fetch(`${baseUrl}/pulls/${message.pullRequestNumber}`, {
+      method: 'PATCH',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${githubPat}`,
+        'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      body: JSON.stringify({ body }),
+    });
+    try {
+      updatedPullRequest = await response.json();
+    } catch {
+      throw new Error(`GitHub API returned an invalid response (${response.status})`);
+    }
+    if (!response.ok) {
+      throw new Error(updatedPullRequest.message || `Could not update pull request #${message.pullRequestNumber} (${response.status})`);
+    }
+  }
+  await updateCachedIssueMapData(message.owner, message.repo, (data) => ({
+    ...data,
+    pullRequests: [
+      ...(data.pullRequests || []).filter((item) => item.number !== updatedPullRequest.number),
+      updatedPullRequest,
+    ],
+  }));
+  return {
+    pullRequestNumber: updatedPullRequest.number,
+    linkedAnalysisIssueNumbers: analysisIssueNumbers,
+    linkedCountermeasureIssueNumbers: countermeasureIssueNumbers,
+  };
+}
+
 async function checkGitHubPat() {
   const { githubPat } = await chrome.storage.session.get('githubPat');
   if (typeof githubPat !== 'string' || !githubPat) {
@@ -636,6 +659,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'FETCH_REPOSITORY_PULL_REQUESTS') {
+    fetchPullRequests(message)
+      .then((pullRequests) => sendResponse({ ok: true, pullRequests }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
   if (message.type === 'FETCH_ISSUE_DETAILS') {
     fetchIssueDetails(message)
       .then((result) => sendResponse({ ok: true, ...result }))
@@ -652,6 +682,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'LINK_COUNTERMEASURE_ISSUES') {
     linkCountermeasureIssues(message)
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
+  if (message.type === 'LINK_PULL_REQUEST_ISSUES') {
+    linkPullRequestIssues(message)
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;

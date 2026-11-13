@@ -42,6 +42,10 @@ function buildIssueListUrl({ owner, repo, type }) {
   return url.toString();
 }
 
+function buildPullRequestCreateUrl({ owner, repo }) {
+  return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/compare`;
+}
+
 function closeIssueCreateDrawer() {
   if (!activeIssueCreateDrawer) {
     return;
@@ -374,6 +378,226 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
   } catch (error) {
     const errorMessage = document.createElement('p');
     errorMessage.textContent = `Could not display countermeasures: ${error.message}`;
+    errorMessage.setAttribute('role', 'alert');
+    content.replaceChildren(errorMessage);
+  }
+}
+
+async function openPullRequestLinkDrawer(
+  repoContext,
+  relatedAnalysisIssue = null,
+  relatedCountermeasureIssue = null
+) {
+  closeIssueCreateDrawer();
+  const backdrop = document.createElement('div');
+  backdrop.style.cssText = 'position: fixed; inset: 0; z-index: 9999; display: flex; justify-content: flex-end; background: rgba(31, 35, 40, 0.24);';
+  const drawer = document.createElement('section');
+  drawer.setAttribute('role', 'dialog');
+  drawer.setAttribute('aria-modal', 'true');
+  drawer.setAttribute('aria-label', 'Link a pull request to issues');
+  drawer.style.cssText = 'display: flex; flex-direction: column; width: min(640px, 100vw); height: 100%; overflow: hidden; color: var(--fgColor-default, #1f2328); background: var(--bgColor-default, #fff); box-shadow: -8px 0 24px rgba(31, 35, 40, 0.2);';
+
+  const header = document.createElement('header');
+  header.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--borderColor-default, #d1d9e0);';
+  const title = document.createElement('h2');
+  title.textContent = 'Link a pull request';
+  title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 600;';
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.textContent = 'Close';
+  closeButton.className = 'btn btn-sm';
+  header.append(title, closeButton);
+
+  const content = document.createElement('div');
+  content.style.cssText = 'flex: 1; overflow: auto; padding: 16px;';
+  const loadingMessage = document.createElement('p');
+  loadingMessage.textContent = 'Loading pull requests and issues...';
+  loadingMessage.setAttribute('role', 'status');
+  content.appendChild(loadingMessage);
+  drawer.append(header, content);
+  backdrop.appendChild(drawer);
+
+  const previousOverflow = document.body.style.overflow;
+  activeIssueCreateDrawer = { backdrop, previousOverflow, returnFocus: document.activeElement };
+  document.body.style.overflow = 'hidden';
+  document.body.appendChild(backdrop);
+  closeButton.addEventListener('click', closeIssueCreateDrawer);
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) {
+      closeIssueCreateDrawer();
+    }
+  });
+  drawer.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeIssueCreateDrawer();
+    }
+  });
+  closeButton.focus();
+
+  try {
+    const [utilities, issueDataResult, pullRequestsResult] = await Promise.all([
+      issueMapUtilities,
+      fetchIssueMapData(repoContext),
+      fetchRepositoryPullRequests(repoContext).then(
+        (pullRequests) => ({ pullRequests }),
+        (error) => ({ error })
+      ),
+    ]);
+    if (!issueDataResult?.analysisIssues || !issueDataResult?.countermeasureIssues) {
+      throw new Error('The issue list response is incomplete');
+    }
+    const issueData = issueDataResult;
+    const pullRequests = pullRequestsResult.pullRequests || [];
+    const analysisIssues = issueData.analysisIssues || [];
+    const countermeasureIssues = issueData.countermeasureIssues || [];
+    if (pullRequestsResult.error) {
+      throw new Error(`Could not refresh pull requests: ${pullRequestsResult.error.message}`);
+    }
+    if (pullRequests.length === 0) {
+      const emptyMessage = document.createElement('p');
+      emptyMessage.textContent = 'No pull requests are available in this repository.';
+      content.replaceChildren(emptyMessage);
+      return;
+    }
+
+    const form = document.createElement('form');
+    form.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+    const pullRequestLabel = document.createElement('label');
+    pullRequestLabel.textContent = 'Pull request';
+    pullRequestLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
+    const pullRequestSelect = document.createElement('select');
+    pullRequestSelect.className = 'form-control';
+    pullRequestSelect.setAttribute('aria-label', 'Pull request');
+    for (const pullRequest of pullRequests) {
+      const option = document.createElement('option');
+      option.value = String(pullRequest.number);
+      option.textContent = `#${pullRequest.number} ${pullRequest.title}`;
+      pullRequestSelect.appendChild(option);
+    }
+    pullRequestLabel.appendChild(pullRequestSelect);
+
+    const createIssueCheckboxList = (labelText, issues, name, relatedIssue) => {
+      const fieldset = document.createElement('fieldset');
+      fieldset.style.cssText = 'display: flex; flex-direction: column; gap: 8px; padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); border-radius: 6px;';
+      const legend = document.createElement('legend');
+      legend.textContent = labelText;
+      legend.style.fontWeight = '600';
+      fieldset.appendChild(legend);
+      const inputs = [];
+      for (const issue of issues) {
+        const label = document.createElement('label');
+        label.style.cssText = 'display: flex; align-items: flex-start; gap: 8px; font-weight: 400;';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = name;
+        checkbox.value = String(issue.number);
+        checkbox.dataset.issueNumber = String(issue.number);
+        checkbox.checked = issue.number === relatedIssue?.number;
+        const issueText = document.createElement('span');
+        issueText.textContent = `#${issue.number} ${issue.title}`;
+        label.append(checkbox, issueText);
+        fieldset.appendChild(label);
+        inputs.push(checkbox);
+      }
+      if (issues.length === 0) {
+        const empty = document.createElement('p');
+        empty.textContent = `No ${labelText.toLowerCase()} are available.`;
+        empty.className = 'text-small color-fg-muted';
+        fieldset.appendChild(empty);
+      }
+      return { fieldset, inputs };
+    };
+
+    const analysisList = createIssueCheckboxList(
+      'Analysis Results',
+      analysisIssues,
+      'analysisIssue',
+      relatedAnalysisIssue
+    );
+    const countermeasureList = createIssueCheckboxList(
+      'Countermeasures',
+      countermeasureIssues,
+      'countermeasureIssue',
+      relatedCountermeasureIssue
+    );
+    const status = document.createElement('p');
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    const linkButton = document.createElement('button');
+    linkButton.type = 'submit';
+    linkButton.textContent = 'Save issue links';
+    linkButton.className = 'btn btn-primary';
+    linkButton.style.cssText = 'align-self: flex-start;';
+    linkButton.disabled = analysisIssues.length === 0 || countermeasureIssues.length === 0;
+    const helperText = document.createElement('p');
+    helperText.className = 'text-small color-fg-muted';
+    helperText.textContent = 'Selected issue references are added to the pull request body as "Related to #<number>". Existing references are preserved and cannot be removed here.';
+    form.append(
+      pullRequestLabel,
+      analysisList.fieldset,
+      countermeasureList.fieldset,
+      helperText,
+      status,
+      linkButton
+    );
+
+    const updateSelectionsForPullRequest = () => {
+      const selectedPullRequest = pullRequests.find(
+        (pullRequest) => pullRequest.number === Number(pullRequestSelect.value)
+      );
+      const referencedNumbers = new Set(
+        utilities.getPullRequestIssueNumbers(selectedPullRequest?.body, repoContext)
+      );
+      for (const checkbox of [...analysisList.inputs, ...countermeasureList.inputs]) {
+        const isRowSelection = checkbox.value === String(
+          checkbox.name === 'analysisIssue'
+            ? relatedAnalysisIssue?.number
+            : relatedCountermeasureIssue?.number
+        );
+        const alreadyLinked = referencedNumbers.has(Number(checkbox.value));
+        checkbox.checked = alreadyLinked || isRowSelection;
+        checkbox.disabled = alreadyLinked;
+      }
+    };
+    pullRequestSelect.addEventListener('change', updateSelectionsForPullRequest);
+    updateSelectionsForPullRequest();
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const analysisIssueNumbers = analysisList.inputs
+        .filter((input) => input.checked)
+        .map((input) => Number(input.value));
+      const countermeasureIssueNumbers = countermeasureList.inputs
+        .filter((input) => input.checked)
+        .map((input) => Number(input.value));
+      if (analysisIssueNumbers.length === 0 || countermeasureIssueNumbers.length === 0) {
+        status.textContent = 'Select at least one analysis result and one countermeasure.';
+        return;
+      }
+      linkButton.disabled = true;
+      status.textContent = 'Saving issue links...';
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: 'LINK_PULL_REQUEST_ISSUES',
+          ...repoContext,
+          pullRequestNumber: Number(pullRequestSelect.value),
+          analysisIssueNumbers,
+          countermeasureIssueNumbers,
+        });
+        if (!response?.ok) {
+          throw new Error(response?.error || 'Could not save pull request links');
+        }
+        status.textContent = `Linked pull request #${response.pullRequestNumber} to ${response.linkedAnalysisIssueNumbers.length} analysis result(s) and ${response.linkedCountermeasureIssueNumbers.length} countermeasure(s).`;
+        issueMapPageState?.page.loadIssues();
+      } catch (error) {
+        status.textContent = `Could not link the pull request: ${error.message}`;
+      } finally {
+        linkButton.disabled = false;
+      }
+    });
+    content.replaceChildren(form);
+  } catch (error) {
+    const errorMessage = document.createElement('p');
+    errorMessage.textContent = `Could not display pull requests: ${error.message}`;
     errorMessage.setAttribute('role', 'alert');
     content.replaceChildren(errorMessage);
   }
@@ -752,6 +976,17 @@ async function fetchIssueMapData(repoContext) {
   return result;
 }
 
+async function fetchRepositoryPullRequests(repoContext) {
+  const result = await chrome.runtime.sendMessage({
+    type: 'FETCH_REPOSITORY_PULL_REQUESTS',
+    ...repoContext,
+  });
+  if (!result?.ok) {
+    throw new Error(result?.error || 'Could not retrieve pull requests');
+  }
+  return result.pullRequests;
+}
+
 function createIssueMapPage() {
   const repoContext = getRepositoryContext();
   if (!repoContext) {
@@ -767,6 +1002,11 @@ function createIssueMapPage() {
   heading.id = 'issue-map-view-heading';
   heading.textContent = 'Issues Map';
   heading.style.cssText = 'font-size: 16px; font-weight: 600; line-height: 1.25; margin: 0 0 16px;';
+
+  const warning = document.createElement('p');
+  warning.textContent = 'Warning: Countermeasures and PRs are expected to have a 1:1 relationship. A PR linked to multiple Countermeasures is repeated for each Analysis Result–Countermeasure combination.';
+  warning.setAttribute('role', 'note');
+  warning.style.cssText = 'margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--borderColor-attention-emphasis, #bf8700); border-radius: 6px; color: var(--fgColor-attention, #9a6700); background: var(--bgColor-attention-muted, #fff8c5);';
 
   const toolbar = document.createElement('div');
   toolbar.style.cssText = 'display: flex; align-items: center; gap: 12px; margin-bottom: 16px;';
@@ -798,6 +1038,21 @@ function createIssueMapPage() {
     });
   };
 
+  const bindPullRequestLinkButton = (
+    button,
+    relatedAnalysisIssue = null,
+    relatedCountermeasureIssue = null
+  ) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openPullRequestLinkDrawer(repoContext, relatedAnalysisIssue, relatedCountermeasureIssue)
+        .catch((error) => {
+          statusMessage.textContent = `Could not open the pull request linking form: ${error.message}`;
+        });
+    });
+  };
+
   const tableWrapper = document.createElement('div');
   tableWrapper.style.cssText = 'overflow-x: auto; border: 1px solid var(--borderColor-default, #d1d9e0); border-radius: 6px; background-color: var(--bgColor-default, #fff);';
   const table = document.createElement('table');
@@ -817,15 +1072,25 @@ function createIssueMapPage() {
   countermeasureNumberHeader.style.cssText = 'min-width: 72px;';
   const countermeasureHeader = document.createElement('th');
   countermeasureHeader.textContent = 'Countermeasure';
-  countermeasureHeader.colSpan = 8;
-  groups.append(analysisNumberHeader, analysisHeader, countermeasureNumberHeader, countermeasureHeader);
+  countermeasureHeader.colSpan = 5;
+  const pullRequestHeader = document.createElement('th');
+  pullRequestHeader.textContent = 'PR';
+  pullRequestHeader.rowSpan = 2;
+  pullRequestHeader.style.cssText = 'min-width: 90px;';
+  groups.append(
+    analysisNumberHeader,
+    analysisHeader,
+    countermeasureNumberHeader,
+    countermeasureHeader,
+    pullRequestHeader
+  );
 
   const columns = document.createElement('tr');
   const columnNames = [
     'Failure Mode', 'Failure Cause', 'Failure Classification', 'Preventive Measure',
     'Detection Method', 'Effect', 'Severity', 'Occurrence', 'Detection',
     'Content', 'Effect(Effect)', 'Effect(Occurrence)', 'Effect(Detection)',
-    'RPN', 'Status', 'Owner', 'Deadline',
+    'RPN',
   ];
   for (const name of columnNames) {
     const cell = document.createElement('th');
@@ -842,7 +1107,7 @@ function createIssueMapPage() {
   const body = document.createElement('tbody');
   const initialRow = document.createElement('tr');
   const initialCell = document.createElement('td');
-  initialCell.colSpan = 20;
+  initialCell.colSpan = 17;
   initialCell.textContent = 'Loading...';
   initialCell.style.cssText = 'padding: 16px; text-align: center; color: var(--fgColor-muted, #656d76);';
   initialRow.appendChild(initialCell);
@@ -882,7 +1147,23 @@ function createIssueMapPage() {
     appendNumberCell();
     appendEmptyCategoryCell('No analysis results.', ISSUE_MAP_TYPES.ANALYSIS_RESULT, 9);
     appendNumberCell();
-    appendEmptyCategoryCell('No countermeasures.', ISSUE_MAP_TYPES.COUNTERMEASURE, 8);
+    appendEmptyCategoryCell('No countermeasures.', ISSUE_MAP_TYPES.COUNTERMEASURE, 5);
+    const pullRequestCell = document.createElement('td');
+    pullRequestCell.style.cssText = 'padding: 16px; border: 1px solid var(--borderColor-default, #d1d9e0); vertical-align: top;';
+    const createPullRequest = document.createElement('a');
+    createPullRequest.textContent = 'Create new';
+    createPullRequest.className = 'btn btn-sm';
+    createPullRequest.href = buildPullRequestCreateUrl(repoContext);
+    createPullRequest.target = '_blank';
+    createPullRequest.rel = 'noopener noreferrer';
+    const linkPullRequest = document.createElement('button');
+    linkPullRequest.type = 'button';
+    linkPullRequest.textContent = 'Link';
+    linkPullRequest.className = 'btn btn-sm';
+    linkPullRequest.style.marginLeft = '8px';
+    bindPullRequestLinkButton(linkPullRequest);
+    pullRequestCell.append(createPullRequest, linkPullRequest);
+    row.appendChild(pullRequestCell);
     body.replaceChildren(row);
   };
 
@@ -900,12 +1181,20 @@ function createIssueMapPage() {
       button.style.fontSize = '9.33px';
       createActions.appendChild(button);
     }
+    const pullRequestButton = document.createElement('a');
+    pullRequestButton.textContent = 'Create pull request';
+    pullRequestButton.className = 'btn btn-primary btn-sm';
+    pullRequestButton.href = buildPullRequestCreateUrl(repoContext);
+    pullRequestButton.target = '_blank';
+    pullRequestButton.rel = 'noopener noreferrer';
+    pullRequestButton.style.fontSize = '9.33px';
+    createActions.appendChild(pullRequestButton);
   };
   showCreateActions();
 
   const createEmptyCategoryCell = (type, message, utilities, relatedAnalysisIssue = null) => {
     const cell = document.createElement('td');
-    cell.colSpan = type === ISSUE_MAP_TYPES.ANALYSIS_RESULT ? 9 : 8;
+    cell.colSpan = type === ISSUE_MAP_TYPES.ANALYSIS_RESULT ? 9 : 5;
     cell.style.cssText = 'padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); vertical-align: top;';
     const text = document.createElement('div');
     text.textContent = message;
@@ -926,21 +1215,16 @@ function createIssueMapPage() {
     return cell;
   };
 
-  const renderIssues = (analysisIssues, countermeasureIssues, utilities) => {
+  const renderIssues = (analysisIssues, countermeasureIssues, pullRequests, utilities) => {
     const rows = [];
-    const { groups, unlinkedCountermeasures } =
-      utilities.groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues);
-    const issuePairs = groups.flatMap(({ analysisIssue, countermeasureIssues: linked }) => (
-      linked.length > 0
-        ? linked.map((countermeasureIssue) => ({ analysisIssue, countermeasureIssue }))
-        : [{ analysisIssue, countermeasureIssue: null }]
-    ));
-    issuePairs.push(...unlinkedCountermeasures.map((countermeasureIssue) => ({
-      analysisIssue: null,
-      countermeasureIssue,
-    })));
+    const issuePairs = utilities.buildIssueMapRows(
+      analysisIssues,
+      countermeasureIssues,
+      pullRequests,
+      repoContext
+    );
 
-    for (const { analysisIssue, countermeasureIssue } of issuePairs) {
+    for (const { analysisIssue, countermeasureIssue, pullRequest } of issuePairs) {
       const row = document.createElement('tr');
       const createIssueNumberCell = (issue) => {
         const numberCell = document.createElement('td');
@@ -1001,17 +1285,13 @@ function createIssueMapPage() {
       const countermeasureValues = countermeasure
         ? [countermeasure.content, countermeasure.effectImpact,
             countermeasure.effectOccurrence, countermeasure.effectDetection,
-            countermeasure.rpn, countermeasureIssue.countermeasureStatus,
-            countermeasure.owner, countermeasure.deadline]
+            countermeasure.rpn]
         : null;
       if (countermeasureValues) {
-        for (const [valueIndex, value] of countermeasureValues.entries()) {
+        for (const value of countermeasureValues) {
           const cell = document.createElement('td');
           cell.style.cssText = 'padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); background-color: var(--bgColor-default, #fff); color: var(--fgColor-default, #1f2328); font-size: 9.33px; vertical-align: top; white-space: normal; overflow-wrap: anywhere;';
           cell.textContent = value === '' || value == null ? '' : String(value);
-          if (valueIndex === 5 && countermeasureIssue.countermeasureStatusError) {
-            cell.title = countermeasureIssue.countermeasureStatusError;
-          }
           row.appendChild(cell);
         }
       } else {
@@ -1022,6 +1302,34 @@ function createIssueMapPage() {
             analysisIssue
         ));
       }
+      const pullRequestCell = document.createElement('td');
+      pullRequestCell.style.cssText = 'padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); vertical-align: top;';
+      if (pullRequest) {
+        const pullRequestLink = document.createElement('a');
+        pullRequestLink.href = pullRequest.html_url;
+        pullRequestLink.target = '_blank';
+        pullRequestLink.rel = 'noopener noreferrer';
+        pullRequestLink.textContent = `#${pullRequest.number}`;
+        pullRequestLink.title = `View ${pullRequest.title} (#${pullRequest.number})`;
+        pullRequestLink.setAttribute('aria-label', pullRequestLink.title);
+        pullRequestCell.appendChild(pullRequestLink);
+      } else {
+        const createPullRequest = document.createElement('a');
+        createPullRequest.textContent = 'Create new';
+        createPullRequest.className = 'btn btn-sm';
+        createPullRequest.href = buildPullRequestCreateUrl(repoContext);
+        createPullRequest.target = '_blank';
+        createPullRequest.rel = 'noopener noreferrer';
+        createPullRequest.style.cssText = 'margin-right: 8px; font-size: 9.33px;';
+        const linkPullRequest = document.createElement('button');
+        linkPullRequest.type = 'button';
+        linkPullRequest.textContent = 'Link';
+        linkPullRequest.className = 'btn btn-sm';
+        linkPullRequest.style.fontSize = '9.33px';
+        bindPullRequestLinkButton(linkPullRequest, analysisIssue, countermeasureIssue);
+        pullRequestCell.append(createPullRequest, linkPullRequest);
+      }
+      row.appendChild(pullRequestCell);
       rows.push(row);
     }
     body.replaceChildren(...rows);
@@ -1037,8 +1345,15 @@ function createIssueMapPage() {
     try {
       utilities = await issueMapUtilities;
       showCreateActions();
-      const { analysisIssues: rawAnalysisIssues, countermeasureIssues: rawCountermeasureIssues } =
-        await fetchIssueMapData(repoContext);
+      const [issueData, pullRequestsResult] = await Promise.all([
+        fetchIssueMapData(repoContext),
+        fetchRepositoryPullRequests(repoContext).then(
+          (pullRequests) => ({ pullRequests }),
+          (error) => ({ error })
+        ),
+      ]);
+      const { analysisIssues: rawAnalysisIssues, countermeasureIssues: rawCountermeasureIssues } = issueData;
+      const pullRequests = pullRequestsResult.pullRequests || [];
       const analysisIssues = rawAnalysisIssues.map((issue) => {
         const parsed = utilities.parseAnalysisResult(issue.body || '');
         return {
@@ -1056,14 +1371,16 @@ function createIssueMapPage() {
       if (analysisIssues.length === 0 && countermeasureIssues.length === 0) {
         await renderEmptyState(utilities);
       } else {
-        renderIssues(analysisIssues, countermeasureIssues, utilities);
+        renderIssues(analysisIssues, countermeasureIssues, pullRequests, utilities);
       }
-      statusMessage.textContent = `${analysisIssues.length} analysis results, ${countermeasureIssues.length} countermeasures`;
+      statusMessage.textContent = pullRequestsResult.error
+        ? `Could not refresh pull requests: ${pullRequestsResult.error.message}`
+        : `${analysisIssues.length} analysis results, ${countermeasureIssues.length} countermeasures, ${pullRequests.length} pull requests`;
     } catch (error) {
       statusMessage.textContent = `Could not load issues: ${error.message}`;
       const errorRow = document.createElement('tr');
       const errorCell = document.createElement('td');
-      errorCell.colSpan = 20;
+      errorCell.colSpan = 17;
       errorCell.textContent = statusMessage.textContent;
       errorCell.style.cssText = 'padding: 16px; color: var(--fgColor-danger, #cf222e); text-align: center;';
       errorRow.appendChild(errorCell);
@@ -1071,12 +1388,14 @@ function createIssueMapPage() {
     } finally {
       wrapper.loading = false;
       wrapper.loaded = true;
+      wrapper.lastLoadedAt = Date.now();
     }
   };
-  wrapper.append(heading, toolbar, tableWrapper);
+  wrapper.append(heading, warning, toolbar, tableWrapper);
   wrapper.loadIssues = loadIssues;
   wrapper.loading = false;
   wrapper.loaded = false;
+  wrapper.lastLoadedAt = 0;
 
   return wrapper;
 }
@@ -1169,6 +1488,18 @@ function syncIssueMapView() {
   }
 }
 
+function refreshIssueMapWhenReturning() {
+  const page = issueMapPageState?.page;
+  if (window.location.hash !== ISSUE_MAP_ROUTE_HASH
+    || document.visibilityState === 'hidden'
+    || !page?.loaded
+    || page.loading
+    || Date.now() - page.lastLoadedAt < 5000) {
+    return;
+  }
+  page.loadIssues();
+}
+
 function leaveIssueMapForRepositoryNavigation(event) {
   if (window.location.hash !== ISSUE_MAP_ROUTE_HASH || !(event.target instanceof Element)) {
     return;
@@ -1251,6 +1582,8 @@ observer.observe(document.body || document.documentElement, {
 
 window.addEventListener('hashchange', syncIssueMapView);
 window.addEventListener('popstate', syncIssueMapView);
+window.addEventListener('focus', refreshIssueMapWhenReturning);
+document.addEventListener('visibilitychange', refreshIssueMapWhenReturning);
 document.addEventListener('click', leaveIssueMapForRepositoryNavigation, true);
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== 'OPEN_ISSUE_CREATE_DRAWER') {

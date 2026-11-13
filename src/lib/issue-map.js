@@ -37,10 +37,7 @@ const ISSUE_CREATE_BODIES = {
 * Effect(Effect): <!-- insert countermeasure effect on effect -->
 * Effect(Occurrence): <!-- insert countermeasure effect on occurrence -->
 * Effect(Detection): <!-- insert countermeasure effect on detection -->
-* RPN: <!-- insert countermeasure RPN -->
-* Status: <!-- insert countermeasure status -->
-* Owner: <!-- insert countermeasure owner -->
-* Deadline: <!-- insert countermeasure deadline -->`,
+* RPN: <!-- insert countermeasure RPN -->`,
 };
 
 function normalizeText(value) {
@@ -126,8 +123,6 @@ function parseCountermeasure(markdown) {
     effectOccurrence: extractNumberValue(list, ['Effect(Occurrence)', ISSUE_FIELDS.COUNTERMEASURE.effectOccurrence]),
     effectDetection: extractNumberValue(list, ['Effect(Detection)', ISSUE_FIELDS.COUNTERMEASURE.effectDetection]),
     rpn: extractNumberValue(list, ISSUE_FIELDS.COUNTERMEASURE.rpn),
-    owner: extractFieldValue(list, 'Owner'),
-    deadline: extractFieldValue(list, 'Deadline'),
   };
 }
 
@@ -227,14 +222,108 @@ function buildIssueListUrl({ owner, repo, type }) {
   return url.toString();
 }
 
-function deriveCountermeasureStatus({ merged, hasPullRequest }) {
-  if (merged === true) {
-    return 'Complete';
+function buildPullRequestCreateUrl({ owner, repo }) {
+  return `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/compare`;
+}
+
+function getPullRequestIssueNumbers(body, repoContext = null) {
+  const numbers = [];
+  const currentOwner = repoContext?.owner?.toLowerCase();
+  const currentRepo = repoContext?.repo?.toLowerCase();
+  const referencePattern = /(?:(?<qualifiedOwner>[\w.-]+)\/(?<qualifiedRepo>[\w.-]+))?#(?<shortNumber>\d+)|https?:\/\/github\.com\/(?<urlOwner>[\w.-]+)\/(?<urlRepo>[\w.-]+)\/issues\/(?<urlNumber>\d+)/g;
+  const relationshipPattern = /^[ \t]*(?:[-*+][ \t]*)?(?:[*_`]*related[*_`]*[ \t]+[*_`]*to[*_`]*|close[sd]?|fix(?:es|ed)?|resolve[sd]?)\b[ \t]*:?[ \t]*(.+)$/gim;
+  for (const relationship of String(body || '').matchAll(relationshipPattern)) {
+    for (const match of relationship[1].matchAll(referencePattern)) {
+      const owner = match.groups.qualifiedOwner || match.groups.urlOwner;
+      const repo = match.groups.qualifiedRepo || match.groups.urlRepo;
+      if (owner && repo && currentOwner && currentRepo
+        && (owner.toLowerCase() !== currentOwner || repo.toLowerCase() !== currentRepo)) {
+        continue;
+      }
+      numbers.push(Number(match.groups.shortNumber || match.groups.urlNumber));
+    }
   }
-  if (hasPullRequest === true) {
-    return 'In progress';
+  return [...new Set(numbers)].sort((left, right) => left - right);
+}
+
+function addPullRequestIssueReferences(body, issueNumbers, repoContext = null) {
+  if (!Array.isArray(issueNumbers)
+    || issueNumbers.some((number) => !Number.isInteger(number) || number < 1)) {
+    throw new Error('The pull request issue references are invalid');
   }
-  return 'Not started';
+  const existingReferences = getPullRequestIssueNumbers(body, repoContext);
+  const newReferences = [...new Set(issueNumbers)]
+    .filter((number) => !existingReferences.includes(number));
+  const content = String(body || '').trimEnd();
+  if (newReferences.length === 0) {
+    return content;
+  }
+  const referenceLines = newReferences.map((number) => `Related to #${number}`).join('\n');
+  return `${content}${content ? '\n\n' : ''}${referenceLines}`;
+}
+
+function buildIssueMapRows(analysisIssues, countermeasureIssues, pullRequests, repoContext = null) {
+  const analysisByNumber = new Map(analysisIssues.map((issue) => [issue.number, issue]));
+  const countermeasureByNumber = new Map(countermeasureIssues.map((issue) => [issue.number, issue]));
+  const analysisToCountermeasures = new Map(analysisIssues.map((issue) => [issue.number, new Set()]));
+  const countermeasureToAnalyses = new Map(countermeasureIssues.map((issue) => [issue.number, new Set()]));
+
+  const addPair = (analysisNumber, countermeasureNumber) => {
+    if (!analysisByNumber.has(analysisNumber) || !countermeasureByNumber.has(countermeasureNumber)) {
+      return;
+    }
+    analysisToCountermeasures.get(analysisNumber).add(countermeasureNumber);
+    countermeasureToAnalyses.get(countermeasureNumber).add(analysisNumber);
+  };
+
+  for (const countermeasure of countermeasureIssues) {
+    for (const analysisNumber of getAnalysisIssueNumbers(countermeasure.body)) {
+      addPair(analysisNumber, countermeasure.number);
+    }
+  }
+
+  const pullRequestReferences = new Map();
+  for (const pullRequest of pullRequests) {
+    const references = new Set(getPullRequestIssueNumbers(pullRequest.body, repoContext));
+    const analysisNumbers = [...references].filter((number) => analysisByNumber.has(number));
+    const countermeasureNumbers = [...references].filter((number) => countermeasureByNumber.has(number));
+    pullRequestReferences.set(pullRequest.number, references);
+    for (const analysisNumber of analysisNumbers) {
+      for (const countermeasureNumber of countermeasureNumbers) {
+        addPair(analysisNumber, countermeasureNumber);
+      }
+    }
+  }
+
+  const rows = [];
+  for (const analysisIssue of analysisIssues) {
+    const countermeasureNumbers = analysisToCountermeasures.get(analysisIssue.number);
+    if (countermeasureNumbers.size === 0) {
+      rows.push({ analysisIssue, countermeasureIssue: null, pullRequest: null });
+      continue;
+    }
+    for (const countermeasureNumber of countermeasureNumbers) {
+      const countermeasureIssue = countermeasureByNumber.get(countermeasureNumber);
+      const linkedPullRequests = pullRequests.filter((pullRequest) => (
+        pullRequestReferences.get(pullRequest.number)?.has(analysisIssue.number)
+        && pullRequestReferences.get(pullRequest.number)?.has(countermeasureNumber)
+      ));
+      if (linkedPullRequests.length === 0) {
+        rows.push({ analysisIssue, countermeasureIssue, pullRequest: null });
+      } else {
+        for (const pullRequest of linkedPullRequests) {
+          rows.push({ analysisIssue, countermeasureIssue, pullRequest });
+        }
+      }
+    }
+  }
+
+  for (const countermeasureIssue of countermeasureIssues) {
+    if (countermeasureToAnalyses.get(countermeasureIssue.number).size === 0) {
+      rows.push({ analysisIssue: null, countermeasureIssue, pullRequest: null });
+    }
+  }
+  return rows;
 }
 
 function getRepoContextFromPath(pathname) {
@@ -257,6 +346,9 @@ export {
   updateAnalysisIssueReferences,
   groupCountermeasuresByAnalysis,
   buildIssueListUrl,
-  deriveCountermeasureStatus,
+  buildPullRequestCreateUrl,
+  getPullRequestIssueNumbers,
+  addPullRequestIssueReferences,
+  buildIssueMapRows,
   getRepoContextFromPath,
 };

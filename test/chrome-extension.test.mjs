@@ -11,7 +11,10 @@ import {
   updateAnalysisIssueReferences,
   groupCountermeasuresByAnalysis,
   buildIssueListUrl,
-  deriveCountermeasureStatus,
+  buildPullRequestCreateUrl,
+  getPullRequestIssueNumbers,
+  addPullRequestIssueReferences,
+  buildIssueMapRows,
 } from '../src/lib/issue-map.js';
 
 test('parseAnalysisResult extracts structured fields from markdown', () => {
@@ -104,8 +107,6 @@ test('parseCountermeasure extracts measure data from markdown', () => {
 * Effect(Occurrence): 7
 * Effect(Detection): 3
 * RPN: 189
-* Owner: A. Example
-* Deadline: 2026-12-31
 `;
 
   const result = parseCountermeasure(markdown);
@@ -115,8 +116,13 @@ test('parseCountermeasure extracts measure data from markdown', () => {
   assert.equal(result.effectOccurrence, 7);
   assert.equal(result.effectDetection, 3);
   assert.equal(result.rpn, 189);
-  assert.equal(result.owner, 'A. Example');
-  assert.equal(result.deadline, '2026-12-31');
+  assert.deepEqual(result, {
+    content: 'replace the component regularly',
+    effectImpact: 'the system continues operating',
+    effectOccurrence: 7,
+    effectDetection: 3,
+    rpn: 189,
+  });
 });
 
 test('parseCountermeasure reads the English fields from the creation template', () => {
@@ -128,9 +134,6 @@ test('parseCountermeasure reads the English fields from the creation template', 
 * Effect(Occurrence): 2
 * Effect(Detection): 1
 * RPN: 18
-* Status: <!-- insert countermeasure status -->
-* Owner: <!-- insert countermeasure owner -->
-* Deadline: <!-- insert countermeasure deadline -->
 `);
 
   assert.deepEqual(result, {
@@ -139,8 +142,6 @@ test('parseCountermeasure reads the English fields from the creation template', 
     effectOccurrence: 2,
     effectDetection: 1,
     rpn: 18,
-    owner: '',
-    deadline: '',
   });
 });
 
@@ -194,10 +195,7 @@ test('buildIssueCreateUrl adds the countermeasure template and label', () => {
 * Effect(Effect): <!-- insert countermeasure effect on effect -->
 * Effect(Occurrence): <!-- insert countermeasure effect on occurrence -->
 * Effect(Detection): <!-- insert countermeasure effect on detection -->
-* RPN: <!-- insert countermeasure RPN -->
-* Status: <!-- insert countermeasure status -->
-* Owner: <!-- insert countermeasure owner -->
-* Deadline: <!-- insert countermeasure deadline -->`);
+* RPN: <!-- insert countermeasure RPN -->`);
 });
 
 test('buildIssueCreateUrl includes a supplied title and body', () => {
@@ -344,8 +342,73 @@ test('buildIssueListUrl filters the repository issues by label', () => {
   );
 });
 
-test('deriveCountermeasureStatus maps PR status into completed, pending, and not started states', () => {
-  assert.equal(deriveCountermeasureStatus({ merged: true }), 'Complete');
-  assert.equal(deriveCountermeasureStatus({ merged: false, hasPullRequest: true }), 'In progress');
-  assert.equal(deriveCountermeasureStatus({ merged: false, hasPullRequest: false }), 'Not started');
+test('buildPullRequestCreateUrl opens the repository compare page', () => {
+  assert.equal(buildPullRequestCreateUrl({ owner: 'octo-org', repo: 'demo-repo' }),
+    'https://github.com/octo-org/demo-repo/compare');
+});
+
+test('pull request issue references are deduplicated and can be added without removing existing links', () => {
+  assert.deepEqual(
+    getPullRequestIssueNumbers('Closes #2\nRelated to octo-org/demo#4\nhttps://github.com/octo-org/demo/issues/2'),
+    [2, 4]
+  );
+  assert.equal(
+    addPullRequestIssueReferences('Closes #2', [2, 4, 4]),
+    'Closes #2\n\nRelated to #4'
+  );
+  assert.deepEqual(
+    getPullRequestIssueNumbers(
+      'Related to octo-org/demo#4\nRelated to another/repo#5\nRelated to https://github.com/octo-org/demo/issues/6',
+      { owner: 'octo-org', repo: 'demo' }
+    ),
+    [4, 6]
+  );
+  assert.deepEqual(
+    getPullRequestIssueNumbers([
+      'Related to #8',
+      '* Related to: #2, #4 and #6',
+      'Fixes #10',
+      'See #99 for details',
+      'Related to another/repo#12',
+    ].join('\n'), { owner: 'octo-org', repo: 'demo' }),
+    [2, 4, 6, 8, 10]
+  );
+  assert.equal(
+    addPullRequestIssueReferences('Related to other/repo#2', [2], {
+      owner: 'octo-org',
+      repo: 'demo',
+    }),
+    'Related to other/repo#2\n\nRelated to #2'
+  );
+});
+
+test('buildIssueMapRows expands PR links into one row per analysis-countermeasure-PR combination', () => {
+  const analysisIssues = [{ number: 2 }, { number: 4 }, { number: 6 }];
+  const countermeasureIssues = [
+    { number: 10, body: 'Related analysis result: #2' },
+    { number: 11, body: '' },
+    { number: 12, body: '' },
+  ];
+  const pullRequests = [
+    { number: 201, body: 'Closes #2\nCloses #4\nRelated to #10\nRelated to #11' },
+    { number: 202, body: 'Closes #4\nRelated to #11' },
+  ];
+  const rows = buildIssueMapRows(analysisIssues, countermeasureIssues, pullRequests, {
+    owner: 'octo-org',
+    repo: 'demo-repo',
+  });
+
+  assert.deepEqual(rows.map(({ analysisIssue, countermeasureIssue, pullRequest }) => [
+    analysisIssue?.number ?? null,
+    countermeasureIssue?.number ?? null,
+    pullRequest?.number ?? null,
+  ]), [
+    [2, 10, 201],
+    [2, 11, 201],
+    [4, 10, 201],
+    [4, 11, 201],
+    [4, 11, 202],
+    [6, null, null],
+    [null, 12, null],
+  ]);
 });
