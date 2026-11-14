@@ -18,6 +18,7 @@ Items marked with `*` describe external behavior. Items marked with `**` describ
 ## Issue Map
 
 * Display Analysis Results, Countermeasures, and pull requests in a spreadsheet-like table styled like GitHub's issue pages, with approximately two-thirds of their font size.
+* Keep each table column fixed at 100px wide. Row height grows with wrapped content up to eight lines; longer cell text is truncated with an ellipsis, and hovering over the cell displays its full text in a tooltip.
 * The first row contains the columns "Analysis Result Number", "Analysis Result", "Countermeasure Number", "Countermeasure", and "PR".
 * The second row contains field headings. Analysis Result fields are "Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", and "Detection". Countermeasure fields are "Content", "Effect(Effect)", "Effect(Occurrence)", "Effect(Detection)", and "RPN".
 * Starting with the third row, cells display values parsed from each GitHub issue body. If the Analysis Result's Failure Mode or Countermeasure's Content is missing, display the issue title instead.

@@ -29,6 +29,12 @@ Given('the repository has Analysis Results {int} and {int} and Countermeasure {i
   )];
 });
 
+Given('Analysis Result issue {int} has a long Failure Mode', function (issueNumber) {
+  const issue = this.fixtures.analysisIssues.find((item) => item.number === issueNumber);
+  assert.ok(issue, `Analysis Result issue #${issueNumber} is not in the fixture`);
+  issue.body = `### analysis result\n* Failure Mode: ${'A long failure mode sentence that wraps into many lines. '.repeat(12)}\n* Severity: 8`;
+});
+
 Given('pull request {int} references issues {int}, {int}, and {int}', function (pullRequestNumber, firstAnalysis, secondAnalysis, countermeasure) {
   this.fixtures.pullRequests = [{
     number: pullRequestNumber,
@@ -163,6 +169,16 @@ Then('the Analysis Result, Countermeasure, and pull request are shown in one row
 
 Then('the one-to-one relationship warning is displayed', async function () {
   await this.page.getByRole('note').getByText(/Countermeasures and PRs are expected to have a 1:1 relationship/).waitFor();
+});
+
+Then('the long cell is 100 pixels wide, clamped to 8 lines, and has the full-text tooltip', async function () {
+  const fullText = `${'A long failure mode sentence that wraps into many lines. '.repeat(12)}`.trimEnd();
+  const text = this.page.locator('.issue-map-cell-text').filter({ hasText: fullText }).first();
+  await text.waitFor();
+  assert.equal(await text.getAttribute('title'), fullText);
+  assert.equal(await text.evaluate((element) => getComputedStyle(element).webkitLineClamp), '8');
+  assert.equal(await text.evaluate((element) => Math.round(element.parentElement.getBoundingClientRect().width)), 100);
+  assert.equal(await text.evaluate((element) => element.scrollHeight > element.clientHeight), true);
 });
 
 Then('the one-to-one relationship warning is hidden', async function () {

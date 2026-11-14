@@ -10,6 +10,12 @@ Feature: GitHub Issues Map
     And the one-to-one relationship warning is hidden
     And removed Countermeasure fields are not displayed
 
+  Scenario: Wrap long cell text and show its full value in a tooltip
+    Given the repository has Analysis Result issue 2 and Countermeasure issue 10 linked to it
+    And Analysis Result issue 2 has a long Failure Mode
+    When I open the Issues Map
+    Then the long cell is 100 pixels wide, clamped to 8 lines, and has the full-text tooltip
+
   Scenario: Display the relationship warning when one PR links multiple Countermeasures
     Given the repository has Analysis Result issue 2 and Countermeasures 10 and 11 linked to it
     And pull request 20 references Analysis Result 2 and Countermeasures 10 and 11

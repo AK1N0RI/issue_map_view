@@ -1071,27 +1071,31 @@ function createIssueMapPage() {
   const tableWrapper = document.createElement('div');
   tableWrapper.style.cssText = 'overflow-x: auto; border: 1px solid var(--borderColor-default, #d1d9e0); border-radius: 6px; background-color: var(--bgColor-default, #fff);';
   const table = document.createElement('table');
-  table.style.cssText = 'border-collapse: collapse; min-width: 100%; width: max-content; table-layout: auto; color: inherit; font: inherit;';
+  table.style.cssText = 'border-collapse: collapse; width: 1700px; min-width: 1700px; table-layout: fixed; color: inherit; font: inherit;';
+  const columnGroup = document.createElement('colgroup');
+  for (let index = 0; index < 17; index += 1) {
+    const column = document.createElement('col');
+    column.style.width = '100px';
+    columnGroup.appendChild(column);
+  }
+  table.appendChild(columnGroup);
   const header = document.createElement('thead');
   const groups = document.createElement('tr');
   const analysisNumberHeader = document.createElement('th');
   analysisNumberHeader.textContent = 'Number';
   analysisNumberHeader.rowSpan = 2;
-  analysisNumberHeader.style.cssText = 'min-width: 72px;';
   const analysisHeader = document.createElement('th');
   analysisHeader.textContent = 'Analysis Result';
   analysisHeader.colSpan = 9;
   const countermeasureNumberHeader = document.createElement('th');
   countermeasureNumberHeader.textContent = 'Number';
   countermeasureNumberHeader.rowSpan = 2;
-  countermeasureNumberHeader.style.cssText = 'min-width: 72px;';
   const countermeasureHeader = document.createElement('th');
   countermeasureHeader.textContent = 'Countermeasure';
   countermeasureHeader.colSpan = 5;
   const pullRequestHeader = document.createElement('th');
   pullRequestHeader.textContent = 'PR';
   pullRequestHeader.rowSpan = 2;
-  pullRequestHeader.style.cssText = 'min-width: 90px;';
   groups.append(
     analysisNumberHeader,
     analysisHeader,
@@ -1110,12 +1114,11 @@ function createIssueMapPage() {
   for (const name of columnNames) {
     const cell = document.createElement('th');
     cell.textContent = name;
-    cell.style.cssText = 'min-width: 130px;';
     columns.appendChild(cell);
   }
   for (const row of [groups, columns]) {
     for (const cell of row.children) {
-      cell.style.cssText += 'padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-muted, #f6f8fa); color: var(--fgColor-default, #1f2328); font-size: 9.33px; font-weight: 600; text-align: left; vertical-align: top; white-space: nowrap;';
+      cell.style.cssText += 'box-sizing: border-box; padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); background: var(--bgColor-muted, #f6f8fa); color: var(--fgColor-default, #1f2328); font-size: 9.33px; font-weight: 600; text-align: left; vertical-align: top; white-space: normal; overflow-wrap: anywhere;';
     }
   }
   header.append(groups, columns);
@@ -1129,6 +1132,16 @@ function createIssueMapPage() {
   body.appendChild(initialRow);
   table.append(header, body);
   tableWrapper.appendChild(table);
+
+  const appendCellText = (cell, value) => {
+    const text = value === '' || value == null ? '' : String(value);
+    const content = document.createElement('div');
+    content.className = 'issue-map-cell-text';
+    content.textContent = text;
+    content.title = text;
+    content.style.cssText = 'display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 8; overflow: hidden; white-space: normal; overflow-wrap: anywhere;';
+    cell.appendChild(content);
+  };
 
   const renderEmptyState = async (utilities) => {
     warning.hidden = true;
@@ -1284,8 +1297,8 @@ function createIssueMapPage() {
       if (analysisValues) {
         for (const value of analysisValues) {
           const cell = document.createElement('td');
-          cell.style.cssText = 'padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); background-color: var(--bgColor-default, #fff); color: var(--fgColor-default, #1f2328); font-size: 9.33px; vertical-align: top; white-space: normal; overflow-wrap: anywhere;';
-          cell.textContent = value === '' || value == null ? '' : String(value);
+          cell.style.cssText = 'box-sizing: border-box; padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); background-color: var(--bgColor-default, #fff); color: var(--fgColor-default, #1f2328); font-size: 9.33px; vertical-align: top;';
+          appendCellText(cell, value);
           row.appendChild(cell);
         }
       } else {
@@ -1313,8 +1326,8 @@ function createIssueMapPage() {
       if (countermeasureValues) {
         for (const value of countermeasureValues) {
           const cell = document.createElement('td');
-          cell.style.cssText = 'padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); background-color: var(--bgColor-default, #fff); color: var(--fgColor-default, #1f2328); font-size: 9.33px; vertical-align: top; white-space: normal; overflow-wrap: anywhere;';
-          cell.textContent = value === '' || value == null ? '' : String(value);
+          cell.style.cssText = 'box-sizing: border-box; padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); background-color: var(--bgColor-default, #fff); color: var(--fgColor-default, #1f2328); font-size: 9.33px; vertical-align: top;';
+          appendCellText(cell, value);
           row.appendChild(cell);
         }
       } else {
