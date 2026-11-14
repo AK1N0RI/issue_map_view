@@ -15,7 +15,7 @@ import {
   getPullRequestIssueNumbers,
   addPullRequestIssueReferences,
   buildIssueMapRows,
-} from '../src/lib/issue-map.js';
+} from '../../src/lib/issue-map.js';
 
 test('parseAnalysisResult extracts structured fields from markdown', () => {
   const markdown = `

@@ -14,7 +14,16 @@ Issue Map View is a Chrome extension for GitHub repositories that visualizes FME
 ## Structure
 
 - `src/` - Chrome extension source files
-- `test/` - validation scripts for the issue parsing and URL generation logic
+- `test/module/` - isolated Node.js module tests for parsing and relationship logic
+- `test/e2e/` - Gherkin feature scenarios and Playwright browser tests
+
+## Run tests
+
+Run all module and mocked browser tests with `npm test`. Run only the module suite with `npm run test:module`, or only the Cucumber/Playwright suite with `npm run test:e2e`. Test dependencies are installed under `test/node_modules`; the runner installs them and Playwright Chromium when needed.
+
+The mocked E2E suite runs against a local fixture and does not log in to GitHub, read a PAT, or make live GitHub requests. No GitHub login is needed for `npm test`.
+
+An opt-in live Chrome/GitHub test is available with `npm run test:live`. It uses the dedicated `AK1N0RI/issue_map_test` repository, creates marked test issues, and updates the pull request number entered at runtime. It uses a temporary Chrome profile, asks for the PAT through a hidden terminal prompt, and removes the profile at the end. It does not save credentials or automatically clean up GitHub changes. Prepare the dedicated repository and review the safety steps in [`test/e2etest/README.md`](./test/e2etest/README.md) before running it. The HTML report is written to `test/e2etest/report.html`.
 
 ## Load in Chrome
 

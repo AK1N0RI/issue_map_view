@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node test/run-tests.mjs all",
+    "test:module": "node test/run-tests.mjs module",
+    "test:e2e": "node test/run-tests.mjs e2e",
+    "test:live": "node test/run-tests.mjs live"
   }
 }
