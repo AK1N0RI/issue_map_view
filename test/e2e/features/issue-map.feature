@@ -17,6 +17,11 @@ Feature: GitHub Issues Map
     And I go back to the repository page
     Then the repository content is visible and the Issues Map is closed
 
+  Scenario: Do not show the Issues Map without all repository navigation tabs
+    Given the repository page does not have a Pull requests navigation tab
+    When the content script is loaded there with the Issues Map route active
+    Then the Issues Map tab and view are not displayed
+
   Scenario: Expand one pull request into each issue combination
     Given the repository has Analysis Results 2 and 4 and Countermeasure 10 linked to both
     And pull request 20 references issues 2, 4, and 10

@@ -44,12 +44,22 @@ Given('the repository has no labeled issues or pull requests', function () {
   this.fixtures.pullRequests = [];
 });
 
+Given('the repository page does not have a Pull requests navigation tab', function () {
+  this.fixtures.analysisIssues = [];
+  this.fixtures.countermeasureIssues = [];
+  this.fixtures.pullRequests = [];
+});
+
 Given('pull request {int} has no issue references', function (pullRequestNumber) {
   this.setUnlinkedPullRequest(pullRequestNumber);
 });
 
 When('I open the Issues Map', async function () {
   await this.openIssueMap();
+});
+
+When('the content script is loaded there with the Issues Map route active', async function () {
+  await this.openRepositoryPageWithoutPullRequestsNavigation();
 });
 
 When('I go back to the repository page', async function () {
@@ -101,6 +111,11 @@ Then('the one-to-one relationship warning is displayed', async function () {
 
 Then('the repository content is visible and the Issues Map is closed', async function () {
   await this.page.locator('#repository-content').waitFor({ state: 'visible' });
+  assert.equal(await this.page.locator('#issue-map-view-table').count(), 0);
+});
+
+Then('the Issues Map tab and view are not displayed', async function () {
+  assert.equal(await this.page.getByRole('tab', { name: 'Issues Map' }).count(), 0);
   assert.equal(await this.page.locator('#issue-map-view-table').count(), 0);
 });
 

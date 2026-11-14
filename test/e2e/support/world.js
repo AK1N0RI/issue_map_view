@@ -20,6 +20,20 @@ const repositoryHtml = `<!doctype html>
     </main>
   </body>
 </html>`;
+const incompleteRepositoryHtml = `<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Repository settings</title></head>
+  <body>
+    <main>
+      <nav aria-label="Repository" class="UnderlineNav-body">
+        <a href="/octo-org/demo-repo">Code</a>
+        <a href="/octo-org/demo-repo/issues">Issues</a>
+        <a href="/octo-org/demo-repo/settings">Settings</a>
+      </nav>
+      <section id="repository-content"><h1>Repository settings</h1></section>
+    </main>
+  </body>
+</html>`;
 
 function createIssue(number, title, type, body) {
   return {
@@ -57,7 +71,7 @@ class IssueMapWorld {
         return;
       }
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      response.end(repositoryHtml);
+      response.end(requestPath.endsWith('/settings') ? incompleteRepositoryHtml : repositoryHtml);
     });
     await new Promise((resolve, reject) => {
       this.server.once('error', reject);
@@ -76,6 +90,11 @@ class IssueMapWorld {
     await this.page.getByRole('tab', { name: 'Issues Map' }).click();
     await this.page.locator('#issue-map-view-table tbody tr').first().waitFor();
     await this.page.getByText(/\d+ analysis results,/).waitFor();
+  }
+
+  async openRepositoryPageWithoutPullRequestsNavigation() {
+    await this.page.goto(`${this.baseUrl}/octo-org/demo-repo/settings#issue-map-view`);
+    await this.page.addScriptTag({ path: path.join(projectRoot, 'src/content.js') });
   }
 
   async startPage() {

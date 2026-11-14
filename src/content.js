@@ -891,10 +891,14 @@ function getRepoNavigation() {
   for (const candidate of candidates) {
     let hasCodeLink = false;
     let hasIssuesLink = false;
+    let hasPullRequestsLink = false;
 
     for (const link of candidate.querySelectorAll('a[href]')) {
       try {
         const pathname = new URL(link.getAttribute('href'), window.location.origin).pathname;
+        if (pathname !== repositoryPath && !pathname.startsWith(`${repositoryPath}/`)) {
+          continue;
+        }
         const repoRelativePath = pathname.slice(repositoryPath.length);
         if (
           pathname === repositoryPath ||
@@ -905,12 +909,15 @@ function getRepoNavigation() {
         if (repoRelativePath === '/issues' || repoRelativePath.startsWith('/issues/')) {
           hasIssuesLink = true;
         }
+        if (repoRelativePath === '/pulls' || repoRelativePath.startsWith('/pulls/')) {
+          hasPullRequestsLink = true;
+        }
       } catch {
         // ignore invalid href values
       }
     }
 
-    if (hasCodeLink && hasIssuesLink) {
+    if (hasCodeLink && hasIssuesLink && hasPullRequestsLink) {
       return candidate;
     }
   }
@@ -1462,7 +1469,8 @@ function showIssueMapPage() {
 
 function syncIssueMapView() {
   const repoContext = getRepositoryContext();
-  if (!repoContext) {
+  if (!repoContext || !getRepoNavigation()) {
+    document.getElementById(ISSUE_MAP_MENU_ID)?.remove();
     restoreRepositoryPage();
     return;
   }
@@ -1556,15 +1564,8 @@ function addIssueMapTab() {
   }
 
   if (button.isConnected) {
-    return;
+    button.remove();
   }
-
-  const fallback = document.querySelector('main') || document.body;
-  if (!fallback) {
-    return;
-  }
-
-  fallback.appendChild(button);
 }
 
 function initializeIssueMapView() {
