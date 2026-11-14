@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Issue Map View</title>
+    <style>
+      body {
+        width: 360px;
+        font-family: sans-serif;
+        margin: 0;
+        padding: 16px;
+        background: #ffffff;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 12px;
+      }
+      .section {
+        margin-top: 12px;
+      }
+      button {
+        width: 100%;
+        border: 1px solid #d0d7de;
+        background: #f6f8fa;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-top: 8px;
+        cursor: pointer;
+      }
+      .small {
+        font-size: 12px;
+        color: #57606a;
+      }
+      #issue-create-status {
+        color: #cf222e;
+        font-size: 12px;
+      }
+      .token-input {
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 8px;
+        margin-top: 6px;
+      }
+      #pat-status {
+        min-height: 16px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Issues Map</h1>
+    <p id="issue-create-status" role="status"></p>
+
+    <div class="section">
+      <div class="small">Analysis results</div>
+      <button id="new-analysis-result">Create new</button>
+      <button id="link-analysis-result">Link</button>
+    </div>
+
+    <div class="section">
+      <div class="small">Countermeasures</div>
+      <button id="new-countermeasure">Create new</button>
+      <button id="link-countermeasure">Link</button>
+    </div>
+
+    <div class="section">
+      <label class="small" for="github-pat">GitHub Fine-grained PAT</label>
+      <input id="github-pat" class="token-input" type="password" autocomplete="off" spellcheck="false" />
+      <div class="small">Requires Issues: Read and write and Pull requests: Read and write access to the target repository. The token is stored until the browser session ends or the extension is reloaded.</div>
+      <button id="save-github-pat" type="button">Save token</button>
+      <button id="clear-github-pat" type="button">Remove token</button>
+      <p id="pat-status" role="status" aria-live="polite"></p>
+      <button id="open-extension-settings" type="button">Open extension settings</button>
+    </div>
+
+    <script src="pat-settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

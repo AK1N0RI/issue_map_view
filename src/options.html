@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Issue Map View Settings</title>
+    <style>
+      body {
+        max-width: 640px;
+        margin: 40px auto;
+        padding: 0 24px;
+        color: #1f2328;
+        font-family: sans-serif;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      label {
+        display: block;
+        margin-top: 24px;
+        font-weight: 600;
+      }
+      .token-input {
+        box-sizing: border-box;
+        width: 100%;
+        margin-top: 8px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 10px;
+      }
+      .help {
+        color: #57606a;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      button {
+        margin: 12px 8px 0 0;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 8px 12px;
+        background: #f6f8fa;
+        cursor: pointer;
+      }
+      #pat-status {
+        min-height: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Issue Map View Settings</h1>
+    <p class="help">Configure a fine-grained personal access token (PAT) with access to the target repository. Grant these repository permissions:</p>
+    <ul class="help">
+      <li><strong>Issues: Read and write</strong> — list, create, update, and link Analysis Result and Countermeasure issues.</li>
+      <li><strong>Pull requests: Read and write</strong> — list pull requests and add issue references to their descriptions.</li>
+      <li><strong>Projects: Read and write</strong> — view and edit Project v2 membership.</li>
+    </ul>
+    <p class="help">The token is stored only for the current browser session and is removed when the browser session ends or the extension is reloaded.</p>
+
+    <label for="github-pat">GitHub Fine-grained PAT</label>
+    <input
+      id="github-pat"
+      class="token-input"
+      type="password"
+      autocomplete="off"
+      spellcheck="false"
+      aria-describedby="pat-help"
+    />
+    <p id="pat-help" class="help">The token itself is never displayed again. To replace it, enter a new token and save it.</p>
+    <button id="save-github-pat" type="button">Save token</button>
+    <button id="clear-github-pat" type="button">Remove token</button>
+    <p id="pat-status" role="status" aria-live="polite"></p>
+
+    <script src="pat-settings.js"></script>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+# Dependencies and generated test output
+**/node_modules/
+test-results/
+playwright-report/
+blob-report/
+coverage/
+test/e2e/report.html
+test/e2etest/report.html
+test/e2etest/local-notes*
+
+# Local credentials and authentication state
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.token
+*.secret
+secrets/
+credentials/
+.auth/
+**/.auth/
+auth.json
+
+# Local files
+*.log
+.DS_Store
