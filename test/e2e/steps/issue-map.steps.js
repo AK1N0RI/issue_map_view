@@ -33,7 +33,33 @@ Given('pull request {int} references issues {int}, {int}, and {int}', function (
   this.fixtures.pullRequests = [{
     number: pullRequestNumber,
     title: `Pull request ${pullRequestNumber}`,
-    body: `Related to #${firstAnalysis}\nRelated to #${secondAnalysis}\nRelated to #${countermeasure}`,
+    body: `Related to analysis result #${firstAnalysis}\nRelated to analysis result #${secondAnalysis}\nRelated to countermeasure #${countermeasure}`,
+    html_url: `https://github.com/octo-org/demo-repo/pull/${pullRequestNumber}`,
+  }];
+});
+
+Given('the repository has Analysis Result issue {int} and Countermeasures {int} and {int} linked to it', function (analysisNumber, firstCountermeasure, secondCountermeasure) {
+  this.fixtures.analysisIssues = [createIssue(
+    analysisNumber,
+    `Analysis result ${analysisNumber}`,
+    'analysis_result',
+    `### analysis result\n* Failure Mode: Failure mode ${analysisNumber}\n* Severity: 8`
+  )];
+  this.fixtures.countermeasureIssues = [firstCountermeasure, secondCountermeasure].map((number) => (
+    createIssue(
+      number,
+      `Countermeasure ${number}`,
+      'countermeasure',
+      `### countermeasure\n* Content: Countermeasure content ${number}\n* Related analysis result: #${analysisNumber}`
+    )
+  ));
+});
+
+Given('pull request {int} references Analysis Result {int} and Countermeasures {int} and {int}', function (pullRequestNumber, analysisNumber, firstCountermeasure, secondCountermeasure) {
+  this.fixtures.pullRequests = [{
+    number: pullRequestNumber,
+    title: `Pull request ${pullRequestNumber}`,
+    body: `Related to analysis result #${analysisNumber}\nRelated to countermeasure #${firstCountermeasure}\nRelated to countermeasure #${secondCountermeasure}`,
     html_url: `https://github.com/octo-org/demo-repo/pull/${pullRequestNumber}`,
   }];
 });
@@ -89,12 +115,29 @@ When('I link the pull request in the map to the displayed issues', async functio
   await this.page.getByRole('button', { name: 'Link', exact: true }).last().click();
   const drawer = this.page.getByRole('dialog', { name: 'Link a pull request to issues' });
   await drawer.getByLabel('Pull request').selectOption('20');
+  const fetchCountsBeforeSave = await this.page.evaluate(() => ({
+    issueMap: window.__issueMapTestState.issueMapFetchCount,
+    pullRequests: window.__issueMapTestState.pullRequestFetchCount,
+  }));
   await drawer.getByRole('button', { name: 'Save issue links' }).click();
   await drawer.getByText(/Linked pull request #20/).waitFor();
-  await this.page.waitForFunction(() => (
-    window.__issueMapTestState.pullRequests[0].body.includes('Related to #2')
-      && window.__issueMapTestState.pullRequests[0].body.includes('Related to #10')
-  ));
+  const fetchCountsAfterSave = await this.page.evaluate(() => ({
+    issueMap: window.__issueMapTestState.issueMapFetchCount,
+    pullRequests: window.__issueMapTestState.pullRequestFetchCount,
+  }));
+  assert.deepEqual(fetchCountsAfterSave, fetchCountsBeforeSave);
+  assert.equal(
+    await this.page.locator('#issue-map-view-table a[href*="/pull/20"]').count(),
+    1,
+    'The map should show the linked PR immediately without fetching the map again'
+  );
+  const updatedBody = await this.page.evaluate(
+    () => window.__issueMapTestState.pullRequests[0].body
+  );
+  assert.match(updatedBody, /Related to analysis result #2/);
+  assert.match(updatedBody, /Related to countermeasure #10/);
+  assert.match(updatedBody, /<!-- Issue Map relationship guidance/);
+  assert.match(updatedBody, /Related to countermeasure #<number>/);
 });
 
 Then('the Analysis Result, Countermeasure, and pull request are shown in one row', async function () {
@@ -107,6 +150,10 @@ Then('the Analysis Result, Countermeasure, and pull request are shown in one row
 
 Then('the one-to-one relationship warning is displayed', async function () {
   await this.page.getByRole('note').getByText(/Countermeasures and PRs are expected to have a 1:1 relationship/).waitFor();
+});
+
+Then('the one-to-one relationship warning is hidden', async function () {
+  assert.equal(await this.page.getByRole('note').count(), 0);
 });
 
 Then('the repository content is visible and the Issues Map is closed', async function () {

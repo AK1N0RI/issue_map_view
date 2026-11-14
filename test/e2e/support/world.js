@@ -48,6 +48,8 @@ function createIssue(number, title, type, body) {
 function defaultFixtures() {
   return {
     nextIssueNumber: 100,
+    issueMapFetchCount: 0,
+    pullRequestFetchCount: 0,
     analysisIssues: [],
     countermeasureIssues: [],
     pullRequests: [],
@@ -114,6 +116,7 @@ class IssueMapWorld {
           },
           sendMessage: async (message) => {
             if (message.type === 'FETCH_ISSUE_MAP_DATA') {
+              state().issueMapFetchCount += 1;
               return {
                 ok: true,
                 analysisIssues: state().analysisIssues,
@@ -121,6 +124,7 @@ class IssueMapWorld {
               };
             }
             if (message.type === 'FETCH_REPOSITORY_PULL_REQUESTS') {
+              state().pullRequestFetchCount += 1;
               return { ok: true, pullRequests: state().pullRequests };
             }
             if (message.type === 'FETCH_ISSUE_DETAILS') {
@@ -175,17 +179,38 @@ class IssueMapWorld {
                 return { ok: false, error: 'Pull request not found' };
               }
               const numbers = [
-                ...message.analysisIssueNumbers,
-                ...message.countermeasureIssueNumbers,
+                ...message.analysisIssueNumbers.map((number) => ({
+                  number,
+                  issueType: 'analysis result',
+                })),
+                ...message.countermeasureIssueNumbers.map((number) => ({
+                  number,
+                  issueType: 'countermeasure',
+                })),
               ];
-              const references = new Set(
-                [...pullRequest.body.matchAll(/Related to #(\d+)/g)].map((match) => Number(match[1]))
-              );
-              const added = numbers.filter((number) => !references.has(number));
-              pullRequest.body += `${pullRequest.body ? '\n\n' : ''}${added.map((number) => `Related to #${number}`).join('\n')}`;
+              const added = numbers.filter(({ number, issueType }) => {
+                const typedReference = new RegExp(
+                  `Related to ${issueType.replace(' ', '[ _-]+')} #${number}\\b`,
+                  'i'
+                );
+                return !typedReference.test(pullRequest.body);
+              });
+              if (added.length > 0) {
+                const guidance = pullRequest.body.includes('<!-- Issue Map relationship guidance')
+                  ? ''
+                  : '<!-- Issue Map relationship guidance\n'
+                    + '"Related to analysis result #<number>" links an Analysis Result.\n'
+                    + '"Related to countermeasure #<number>" links a Countermeasure.\n'
+                    + 'Add one reference per line. This optional note can be removed.\n'
+                    + '-->\n';
+                pullRequest.body += `${pullRequest.body ? '\n\n' : ''}${guidance}${added
+                  .map(({ number, issueType }) => `Related to ${issueType} #${number}`)
+                  .join('\n')}`;
+              }
               return {
                 ok: true,
                 pullRequestNumber: pullRequest.number,
+                pullRequest: structuredClone(pullRequest),
                 linkedAnalysisIssueNumbers: message.analysisIssueNumbers,
                 linkedCountermeasureIssueNumbers: message.countermeasureIssueNumbers,
               };

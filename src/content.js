@@ -531,7 +531,7 @@ async function openPullRequestLinkDrawer(
     linkButton.disabled = analysisIssues.length === 0 || countermeasureIssues.length === 0;
     const helperText = document.createElement('p');
     helperText.className = 'text-small color-fg-muted';
-    helperText.textContent = 'Selected issue references are added to the pull request body as "Related to #<number>". Existing references are preserved and cannot be removed here.';
+    helperText.textContent = 'The pull request description records selected issues as "Related to analysis result #<number>" or "Related to countermeasure #<number>". Existing references are preserved and cannot be removed here.';
     form.append(
       pullRequestLabel,
       analysisList.fieldset,
@@ -587,7 +587,7 @@ async function openPullRequestLinkDrawer(
           throw new Error(response?.error || 'Could not save pull request links');
         }
         status.textContent = `Linked pull request #${response.pullRequestNumber} to ${response.linkedAnalysisIssueNumbers.length} analysis result(s) and ${response.linkedCountermeasureIssueNumbers.length} countermeasure(s).`;
-        issueMapPageState?.page.loadIssues();
+        issueMapPageState?.page.updatePullRequest(response.pullRequest);
       } catch (error) {
         status.textContent = `Could not link the pull request: ${error.message}`;
       } finally {
@@ -1012,6 +1012,7 @@ function createIssueMapPage() {
 
   const warning = document.createElement('p');
   warning.textContent = 'Warning: Countermeasures and PRs are expected to have a 1:1 relationship. A PR linked to multiple Countermeasures is repeated for each Analysis Result–Countermeasure combination.';
+  warning.hidden = true;
   warning.setAttribute('role', 'note');
   warning.style.cssText = 'margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--borderColor-attention-emphasis, #bf8700); border-radius: 6px; color: var(--fgColor-attention, #9a6700); background: var(--bgColor-attention-muted, #fff8c5);';
 
@@ -1123,6 +1124,7 @@ function createIssueMapPage() {
   tableWrapper.appendChild(table);
 
   const renderEmptyState = async (utilities) => {
+    warning.hidden = true;
     const row = document.createElement('tr');
     const appendNumberCell = () => {
       const numberCell = document.createElement('td');
@@ -1230,6 +1232,13 @@ function createIssueMapPage() {
       pullRequests,
       repoContext
     );
+    warning.hidden = !pullRequests.some((pullRequest) => {
+      const references = new Set(
+        utilities.getPullRequestIssueNumbers(pullRequest.body, repoContext)
+      );
+      return countermeasureIssues
+        .filter((issue) => references.has(issue.number)).length > 1;
+    });
 
     for (const { analysisIssue, countermeasureIssue, pullRequest } of issuePairs) {
       const row = document.createElement('tr');
@@ -1342,6 +1351,10 @@ function createIssueMapPage() {
     body.replaceChildren(...rows);
   };
 
+  let currentAnalysisIssues = [];
+  let currentCountermeasureIssues = [];
+  let currentPullRequests = [];
+  let currentUtilities = null;
   const loadIssues = async () => {
     if (wrapper.loading) {
       return;
@@ -1375,6 +1388,10 @@ function createIssueMapPage() {
           parsed: { ...parsed, content: parsed.content || issue.title },
         };
       });
+      currentAnalysisIssues = analysisIssues;
+      currentCountermeasureIssues = countermeasureIssues;
+      currentPullRequests = pullRequests;
+      currentUtilities = utilities;
       if (analysisIssues.length === 0 && countermeasureIssues.length === 0) {
         await renderEmptyState(utilities);
       } else {
@@ -1397,6 +1414,22 @@ function createIssueMapPage() {
       wrapper.loaded = true;
       wrapper.lastLoadedAt = Date.now();
     }
+  };
+  wrapper.updatePullRequest = (pullRequest) => {
+    if (!currentUtilities || !pullRequest || !Number.isInteger(pullRequest.number)) {
+      return;
+    }
+    currentPullRequests = [
+      ...currentPullRequests.filter((item) => item.number !== pullRequest.number),
+      pullRequest,
+    ];
+    renderIssues(
+      currentAnalysisIssues,
+      currentCountermeasureIssues,
+      currentPullRequests,
+      currentUtilities
+    );
+    statusMessage.textContent = `${currentAnalysisIssues.length} analysis results, ${currentCountermeasureIssues.length} countermeasures, ${currentPullRequests.length} pull requests`;
   };
   wrapper.append(heading, warning, toolbar, tableWrapper);
   wrapper.loadIssues = loadIssues;

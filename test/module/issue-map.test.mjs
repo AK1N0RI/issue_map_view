@@ -353,8 +353,16 @@ test('pull request issue references are deduplicated and can be added without re
     [2, 4]
   );
   assert.equal(
-    addPullRequestIssueReferences('Closes #2', [2, 4, 4]),
-    'Closes #2\n\nRelated to #4'
+    addPullRequestIssueReferences('Closes #2', {
+      analysisIssueNumbers: [2, 4, 4],
+      countermeasureIssueNumbers: [10],
+    }),
+    'Closes #2\n\n<!-- Issue Map relationship guidance\n'
+      + '"Related to analysis result #<number>" links an Analysis Result.\n'
+      + '"Related to countermeasure #<number>" links a Countermeasure.\n'
+      + 'Add one reference per line. This optional note can be removed.\n'
+      + '-->\nRelated to analysis result #2\nRelated to analysis result #4\n'
+      + 'Related to countermeasure #10'
   );
   assert.deepEqual(
     getPullRequestIssueNumbers(
@@ -373,12 +381,73 @@ test('pull request issue references are deduplicated and can be added without re
     ].join('\n'), { owner: 'octo-org', repo: 'demo' }),
     [2, 4, 6, 8, 10]
   );
+  assert.deepEqual(
+    getPullRequestIssueNumbers([
+      '<!--',
+      'Related to #123',
+      '-->',
+      'Related to #2',
+      'Related to #10',
+    ].join('\n')),
+    [2, 10]
+  );
+  const withGuidance = addPullRequestIssueReferences('', {
+    analysisIssueNumbers: [2],
+    countermeasureIssueNumbers: [10],
+  });
+  assert.match(withGuidance, /Analysis Result/);
+  assert.match(withGuidance, /Countermeasure/);
+  assert.match(withGuidance, /This optional note can be removed/);
+  assert.deepEqual(getPullRequestIssueNumbers(withGuidance), [2, 10]);
+  assert.deepEqual(
+    getPullRequestIssueNumbers(withGuidance.replace(/<!--[\s\S]*?-->\n?/, '')),
+    [2, 10]
+  );
+  assert.match(
+    addPullRequestIssueReferences('Related to #2\nRelated to #10', {
+      analysisIssueNumbers: [2],
+      countermeasureIssueNumbers: [10],
+    }),
+    /<!-- Issue Map relationship guidance/
+  );
   assert.equal(
-    addPullRequestIssueReferences('Related to other/repo#2', [2], {
+    addPullRequestIssueReferences(withGuidance, {
+      analysisIssueNumbers: [2],
+      countermeasureIssueNumbers: [10],
+    }),
+    withGuidance
+  );
+  assert.equal(
+    addPullRequestIssueReferences('Related to other/repo#2', {
+      analysisIssueNumbers: [2],
+      countermeasureIssueNumbers: [],
+    }, {
       owner: 'octo-org',
       repo: 'demo',
     }),
-    'Related to other/repo#2\n\nRelated to #2'
+    'Related to other/repo#2\n\n<!-- Issue Map relationship guidance\n'
+      + '"Related to analysis result #<number>" links an Analysis Result.\n'
+      + '"Related to countermeasure #<number>" links a Countermeasure.\n'
+      + 'Add one reference per line. This optional note can be removed.\n'
+      + '-->\nRelated to analysis result #2'
+  );
+  assert.equal(
+    addPullRequestIssueReferences('Related to #2\nRelated to #10', {
+      analysisIssueNumbers: [2],
+      countermeasureIssueNumbers: [10],
+    }),
+    'Related to #2\nRelated to #10\n\n<!-- Issue Map relationship guidance\n'
+      + '"Related to analysis result #<number>" links an Analysis Result.\n'
+      + '"Related to countermeasure #<number>" links a Countermeasure.\n'
+      + 'Add one reference per line. This optional note can be removed.\n'
+      + '-->\nRelated to analysis result #2\nRelated to countermeasure #10'
+  );
+  assert.throws(
+    () => addPullRequestIssueReferences('', {
+      analysisIssueNumbers: [0],
+      countermeasureIssueNumbers: [],
+    }),
+    /references are invalid/
   );
 });
 

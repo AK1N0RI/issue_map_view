@@ -507,11 +507,10 @@ async function linkPullRequestIssues(message) {
     throw new Error(`Issue #${message.pullRequestNumber} is not a pull request`);
   }
 
-  const issueNumbers = [...analysisResults, ...countermeasures].map((issue) => issue.number);
-  const body = addPullRequestIssueReferences(pullRequest.body || '', issueNumbers, {
-    owner: message.owner,
-    repo: message.repo,
-  });
+  const body = addPullRequestIssueReferences(pullRequest.body || '', {
+    analysisIssueNumbers: analysisResults.map((issue) => issue.number),
+    countermeasureIssueNumbers: countermeasures.map((issue) => issue.number),
+  }, { owner: message.owner, repo: message.repo });
   let updatedPullRequest = pullRequest;
   if (body !== (pullRequest.body || '')) {
     const response = await fetch(`${baseUrl}/pulls/${message.pullRequestNumber}`, {
@@ -542,6 +541,7 @@ async function linkPullRequestIssues(message) {
   }));
   return {
     pullRequestNumber: updatedPullRequest.number,
+    pullRequest: updatedPullRequest,
     linkedAnalysisIssueNumbers: analysisIssueNumbers,
     linkedCountermeasureIssueNumbers: countermeasureIssueNumbers,
   };

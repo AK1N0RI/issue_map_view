@@ -2,13 +2,19 @@ Feature: GitHub Issues Map
   The repository Issues Map presents linked FMEA issues and pull requests,
   and supports the documented creation and linking workflows.
 
-  Scenario: Display parsed issues, linked pull request, and the relationship warning
+  Scenario: Display parsed issues and a linked pull request without the relationship warning
     Given the repository has Analysis Result issue 2 and Countermeasure issue 10 linked to it
     And pull request 20 references issues 2 and 10
     When I open the Issues Map
     Then the Analysis Result, Countermeasure, and pull request are shown in one row
-    And the one-to-one relationship warning is displayed
+    And the one-to-one relationship warning is hidden
     And removed Countermeasure fields are not displayed
+
+  Scenario: Display the relationship warning when one PR links multiple Countermeasures
+    Given the repository has Analysis Result issue 2 and Countermeasures 10 and 11 linked to it
+    And pull request 20 references Analysis Result 2 and Countermeasures 10 and 11
+    When I open the Issues Map
+    Then the one-to-one relationship warning is displayed
 
   Scenario: Return to the repository page with browser back navigation
     Given the repository has Analysis Result issue 2 and Countermeasure issue 10 linked to it
@@ -31,6 +37,7 @@ Feature: GitHub Issues Map
   Scenario: Create a Countermeasure from the map
     Given the repository has no labeled issues or pull requests
     When I open the Issues Map
+    Then the one-to-one relationship warning is hidden
     And I create a Countermeasure titled "Replace the bearing"
     Then the creation succeeds and the new Countermeasure appears in the map
 
