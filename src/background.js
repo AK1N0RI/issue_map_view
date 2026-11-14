@@ -210,7 +210,9 @@ async function fetchIssueMapData(message) {
   }
   const cacheKey = getIssueMapCacheKey(message.owner, message.repo);
   const cached = (await chrome.storage.session.get(cacheKey))[cacheKey];
-  if (cached?.expiresAt > Date.now() && Array.isArray(cached.data.pullRequests)) {
+  if (cached?.expiresAt > Date.now()
+    && Array.isArray(cached.data.analysisIssues)
+    && Array.isArray(cached.data.countermeasureIssues)) {
     return cached.data;
   }
   const pendingRequest = issueMapDataRequests.get(cacheKey);
@@ -230,13 +232,12 @@ async function fetchIssueMapData(message) {
 async function fetchFreshIssueMapData(message) {
   const githubPat = await getGitHubPat();
   const issues = await fetchRepositoryIssues(message.owner, message.repo, githubPat);
-  const pullRequests = await fetchRepositoryPullRequests(message.owner, message.repo, githubPat);
   const hasLabel = (issue, label) => Array.isArray(issue.labels) && issue.labels.some(
     (issueLabel) => typeof issueLabel.name === 'string' && issueLabel.name.toLowerCase() === label
   );
   const analysisIssues = issues.filter((issue) => hasLabel(issue, GITHUB_ISSUE_TYPE.ANALYSIS_RESULT));
   const countermeasureIssues = issues.filter((issue) => hasLabel(issue, GITHUB_ISSUE_TYPE.COUNTERMEASURE));
-  return { analysisIssues, countermeasureIssues, pullRequests };
+  return { analysisIssues, countermeasureIssues };
 }
 
 async function fetchPullRequests(message) {
@@ -340,7 +341,7 @@ async function updateIssueDetails(message) {
   await updateCachedIssue(message.owner, message.repo, message.issueNumber, issue);
 
   if (message.projectIds === null) {
-    return { issueUrl: issue.html_url, projectsUpdated: false };
+    return { issueUrl: issue.html_url, issue, projectsUpdated: false };
   }
 
   try {
@@ -395,7 +396,7 @@ async function updateIssueDetails(message) {
   } catch (error) {
     throw new Error(`The issue title, body, and other fields were saved, but Projects v2 could not be updated: ${error.message}`);
   }
-  return { issueUrl: issue.html_url };
+  return { issueUrl: issue.html_url, issue };
 }
 
 async function linkCountermeasureIssues(message) {

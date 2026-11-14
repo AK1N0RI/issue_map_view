@@ -150,6 +150,7 @@ class IssueMapWorld {
               };
             }
             if (message.type === 'UPDATE_ISSUE_DETAILS') {
+              state().lastIssueUpdateMessage = structuredClone(message);
               const issue = [...state().analysisIssues, ...state().countermeasureIssues]
                 .find((item) => item.number === message.issueNumber);
               if (!issue) {
@@ -158,7 +159,15 @@ class IssueMapWorld {
               issue.title = message.title;
               issue.body = message.body;
               issue.labels = message.labels.map((name) => ({ name }));
-              return { ok: true, issueUrl: issue.html_url };
+              issue.assignees = message.assignees.map((login) => ({ login }));
+              issue.milestone = message.milestone == null
+                ? null
+                : { number: message.milestone, title: `Milestone ${message.milestone}` };
+              return {
+                ok: true,
+                issueUrl: issue.html_url,
+                issue: structuredClone(issue),
+              };
             }
             if (message.type === 'CREATE_GITHUB_ISSUE') {
               const issue = {

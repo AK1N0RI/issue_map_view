@@ -99,8 +99,21 @@ When('I edit Analysis Result issue {int} from its number link', async function (
   await drawer.getByRole('textbox', { name: 'Issue body' }).fill(
     '### analysis result\n* Failure Mode: Updated failure mode\n* Severity: 8'
   );
+  const fetchCountsBeforeSave = await this.page.evaluate(() => ({
+    issueMap: window.__issueMapTestState.issueMapFetchCount,
+    pullRequests: window.__issueMapTestState.pullRequestFetchCount,
+  }));
   await drawer.getByRole('button', { name: 'Save changes' }).click();
-  await drawer.getByText('Changes saved. Refreshing the Issue Map.').waitFor();
+  await drawer.getByText('Changes saved. Issue Map updated.').waitFor();
+  const fetchCountsAfterSave = await this.page.evaluate(() => ({
+    issueMap: window.__issueMapTestState.issueMapFetchCount,
+    pullRequests: window.__issueMapTestState.pullRequestFetchCount,
+    projectIds: window.__issueMapTestState.lastIssueUpdateMessage.projectIds,
+  }));
+  assert.deepEqual(fetchCountsAfterSave, {
+    ...fetchCountsBeforeSave,
+    projectIds: null,
+  });
 });
 
 When('I create a Countermeasure titled {string}', async function (title) {
@@ -192,6 +205,8 @@ Then('the creation succeeds and the new Countermeasure appears in the map', asyn
 Then('the changed issue content appears in the map', async function () {
   await this.page.locator('#issue-map-view-table tbody tr')
     .filter({ hasText: 'Updated failure mode' })
+    .waitFor();
+  await this.page.locator('#issue-map-view-table a[aria-label*="Updated analysis title"]')
     .waitFor();
 });
 

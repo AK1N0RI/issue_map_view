@@ -752,6 +752,7 @@ async function openIssueDetailsDrawer(issue) {
     const projectItems = result.projectItems
       .map((item) => item.project)
       .filter((project) => project?.id);
+    const initialProjectIds = new Set(projectItems.map((project) => project.id));
     const projectById = new Map(
       [...result.projects, ...projectItems].map((project) => [project.id, project])
     );
@@ -796,6 +797,10 @@ async function openIssueDetailsDrawer(issue) {
       }
       saveButton.disabled = true;
       saveStatus.textContent = 'Saving...';
+      const selectedProjectIds = [...projectSelect.selectedOptions]
+        .map((option) => option.value);
+      const projectsChanged = selectedProjectIds.length !== initialProjectIds.size
+        || selectedProjectIds.some((projectId) => !initialProjectIds.has(projectId));
       try {
         const updateResult = await chrome.runtime.sendMessage({
           type: 'UPDATE_ISSUE_DETAILS',
@@ -806,15 +811,17 @@ async function openIssueDetailsDrawer(issue) {
           labels: [...labelsSelect.selectedOptions].map((option) => option.value),
           assignees: [...assigneeSelect.selectedOptions].map((option) => option.value),
           milestone: milestoneSelect.value ? Number(milestoneSelect.value) : null,
-          projectIds: result.projectError
-            ? null
-            : [...projectSelect.selectedOptions].map((option) => option.value),
+          projectIds: result.projectError || !projectsChanged ? null : selectedProjectIds,
         });
         if (!updateResult?.ok) {
           throw new Error(updateResult?.error || 'Could not update the issue');
         }
-        saveStatus.textContent = 'Changes saved. Refreshing the Issue Map.';
-        issueMapPageState?.page.loadIssues();
+        saveStatus.textContent = 'Changes saved. Issue Map updated.';
+        if (updateResult.issue) {
+          issueMapPageState?.page.updateIssue(updateResult.issue);
+        } else {
+          issueMapPageState?.page.loadIssues();
+        }
       } catch (error) {
         saveStatus.textContent = `Could not save changes: ${error.message}`;
       } finally {
@@ -1429,6 +1436,45 @@ function createIssueMapPage() {
       currentPullRequests,
       currentUtilities
     );
+    statusMessage.textContent = `${currentAnalysisIssues.length} analysis results, ${currentCountermeasureIssues.length} countermeasures, ${currentPullRequests.length} pull requests`;
+  };
+  wrapper.updateIssue = (issue) => {
+    if (!currentUtilities || !issue || !Number.isInteger(issue.number)) {
+      loadIssues();
+      return;
+    }
+    const hasLabel = (label) => issue.labels?.some(
+      (issueLabel) => issueLabel.name?.toLowerCase() === label
+    );
+    const analysisIssues = currentAnalysisIssues.filter((item) => item.number !== issue.number);
+    const countermeasureIssues = currentCountermeasureIssues
+      .filter((item) => item.number !== issue.number);
+    if (hasLabel(ISSUE_MAP_TYPES.ANALYSIS_RESULT)) {
+      const parsed = currentUtilities.parseAnalysisResult(issue.body || '');
+      analysisIssues.push({
+        ...issue,
+        parsed: { ...parsed, failureMode: parsed.failureMode || issue.title },
+      });
+    }
+    if (hasLabel(ISSUE_MAP_TYPES.COUNTERMEASURE)) {
+      const parsed = currentUtilities.parseCountermeasure(issue.body || '');
+      countermeasureIssues.push({
+        ...issue,
+        parsed: { ...parsed, content: parsed.content || issue.title },
+      });
+    }
+    currentAnalysisIssues = analysisIssues;
+    currentCountermeasureIssues = countermeasureIssues;
+    if (analysisIssues.length === 0 && countermeasureIssues.length === 0) {
+      renderEmptyState(currentUtilities);
+    } else {
+      renderIssues(
+        currentAnalysisIssues,
+        currentCountermeasureIssues,
+        currentPullRequests,
+        currentUtilities
+      );
+    }
     statusMessage.textContent = `${currentAnalysisIssues.length} analysis results, ${currentCountermeasureIssues.length} countermeasures, ${currentPullRequests.length} pull requests`;
   };
   wrapper.append(heading, warning, toolbar, tableWrapper);
