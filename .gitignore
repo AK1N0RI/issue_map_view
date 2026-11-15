@@ -4,6 +4,7 @@ test-results/
 playwright-report/
 blob-report/
 coverage/
+dist/
 test/e2e/report.html
 test/e2etest/report.html
 test/e2etest/local-notes*
