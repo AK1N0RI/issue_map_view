@@ -4,9 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node test/run-tests.mjs all",
+    "test": "node test/run-tests.mjs all && npm run test:security",
+    "test:security": "node --test test/security/*.test.mjs",
     "test:module": "node test/run-tests.mjs module",
     "test:e2e": "node test/run-tests.mjs e2e",
-    "test:live": "node test/run-tests.mjs live"
+    "test:live": "node test/run-tests.mjs live",
+    "package:extension": "node scripts/package-extension.mjs",
+    "release:check": "node scripts/verify-release-version.mjs"
   }
 }

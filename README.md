@@ -1,5 +1,8 @@
 # Issue Map View
 
+[![CI status](https://github.com/AK1N0RI/issue_map_view/actions/workflows/ci.yml/badge.svg)](https://github.com/AK1N0RI/issue_map_view/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/AK1N0RI/issue_map_view?display_name=tag)](https://github.com/AK1N0RI/issue_map_view/releases/latest)
+
 **See the full FMEA story in one place.** Issue Map View is a Chrome extension that turns Failure Analysis issues, Countermeasures, and pull requests into a live, spreadsheet-like map on GitHub repository pages. Follow how a failure connects to its corrective action and implementation PR—without manually piecing together separate issues.
 
 ![Issue Map showing Failure Analyses, Countermeasures, and linked pull requests in a GitHub repository](./img/issues_map.png)
@@ -32,10 +35,20 @@ New issues use the `failure_analysis` label and Failure Analysis terminology. Ex
 
 ## Install in Chrome
 
-1. Clone or download this repository.
-2. Open `chrome://extensions/` in Chrome and enable **Developer mode**.
-3. Select **Load unpacked** and choose this repository's `src/` folder.
-4. Open a GitHub repository page that has the **Code**, **Issues**, and **Pull requests** tabs. The **Issues Map** tab will appear in the repository navigation.
+For local development, clone or download this repository, open `chrome://extensions/` in Chrome, enable **Developer mode**, and select **Load unpacked** to load the `src/` folder. The **Issues Map** tab appears on repository pages with **Code**, **Issues**, and **Pull requests** tabs.
+
+## Releases
+
+The extension version is maintained in both `package.json` and `src/manifest.json`; CI verifies they match. A release is created by pushing a version tag that exactly matches the manifest, for example:
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+GitHub Actions runs tests and security checks before packaging and publishing the GitHub Release. Each release includes `issue-map-view-v<version>.zip`, ready to upload to the Chrome Web Store, and `SHA256SUMS.txt` to verify the package. To submit, download the ZIP from the release and upload it in the Chrome Web Store Developer Dashboard.
+
+Pull requests and pushes to `main`/`master` run the test suites, extension security checks, and a dependency audit. The security checks reject remotely loaded scripts, inline event handlers, dynamic code evaluation, and overly broad web-accessible resources. They help ensure external scripts or macro-like code cannot be silently injected into the extension package.
 
 ## Configure GitHub access
 
@@ -49,7 +62,7 @@ Open the extension's **Details > Extension options** page (or its popup), enter 
 
 ## Run tests
 
-Run the module and mocked browser test suites with:
+Run the module, mocked browser, and extension security test suites with:
 
 ```sh
 npm test
