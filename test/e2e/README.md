@@ -27,7 +27,7 @@ npm --prefix test run test:e2e
 
 Cucumber prints one dot per completed step and a scenario summary at the end. A successful run reports all scenarios as passed and exits with status `0`. If a scenario fails, Cucumber reports the failed step and exits with a non-zero status.
 
-The scenarios cover Issue Map display and navigation, multiple Analysis Result–Countermeasure–PR relationships, Countermeasure creation, issue editing, and linking an existing pull request. See [`features/issue-map.feature`](./features/issue-map.feature) for the full scenario list.
+The scenarios cover Issue Map display and navigation, multiple Failure Analysis–Countermeasure–PR relationships, Countermeasure creation, issue editing, and linking an existing pull request. See [`features/issue-map.feature`](./features/issue-map.feature) for the full scenario list.
 
 Cucumber also writes an HTML report to `test/e2e/report.html`. The report is ignored by Git.
 

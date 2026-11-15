@@ -1,5 +1,5 @@
 const ISSUE_FIELDS = {
-  ANALYSIS_RESULT: {
+  FAILURE_ANALYSIS: {
     failureMode: 'Failure Mode',
     failureCause: 'Failure Cause',
     failureCategory: 'Failure Classification',
@@ -20,7 +20,7 @@ const ISSUE_FIELDS = {
 };
 
 const ISSUE_CREATE_BODIES = {
-  analysis_result: `### analysis result
+  failure_analysis: `### failure analysis
 <!-- do not edit predefined fields -->
 * Failure Mode: <!-- insert failure mode -->
 * Failure Cause: <!-- insert failure cause -->
@@ -41,7 +41,7 @@ const ISSUE_CREATE_BODIES = {
 };
 
 const PULL_REQUEST_RELATIONSHIP_GUIDANCE = `<!-- Issue Map relationship guidance
-"Related to analysis result #<number>" links an Analysis Result.
+"Related to failure analysis #<number>" links a Failure Analysis.
 "Related to countermeasure #<number>" links a Countermeasure.
 Add one reference per line. This optional note can be removed.
 -->`;
@@ -52,8 +52,9 @@ function normalizeText(value) {
 
 function parseBulletList(markdown, heading) {
   const lines = (markdown || '').split(/\r?\n/);
+  const headings = Array.isArray(heading) ? heading : [heading];
   const headingIndex = lines.findIndex((line) => (
-    new RegExp(`^#{1,6}\\s+${heading}\\s*$`, 'i').test(line.trim())
+    headings.some((item) => new RegExp(`^#{1,6}\\s+${item}\\s*$`, 'i').test(line.trim()))
   ));
   const section = [];
   for (const line of lines.slice(headingIndex < 0 ? 0 : headingIndex + 1)) {
@@ -104,19 +105,19 @@ function extractNumberValue(list, fieldLabel) {
   return Number.isFinite(number) ? number : value;
 }
 
-function parseAnalysisResult(markdown) {
-  const list = parseBulletList(markdown, 'analysis result');
+function parseFailureAnalysis(markdown) {
+  const list = parseBulletList(markdown, ['failure analysis', 'analysis result']);
 
   return {
-    failureMode: extractFieldValue(list, ['Failure Mode', ISSUE_FIELDS.ANALYSIS_RESULT.failureMode]),
-    failureCause: extractFieldValue(list, ['Failure Cause', ISSUE_FIELDS.ANALYSIS_RESULT.failureCause]),
-    failureCategory: extractFieldValue(list, ['Failure Classification', ISSUE_FIELDS.ANALYSIS_RESULT.failureCategory]),
-    prevention: extractFieldValue(list, ['Preventive Measure', ISSUE_FIELDS.ANALYSIS_RESULT.prevention]),
-    detectionMethod: extractFieldValue(list, ['Detection Method', ISSUE_FIELDS.ANALYSIS_RESULT.detectionMethod]),
-    effect: extractFieldValue(list, ['Effect', ISSUE_FIELDS.ANALYSIS_RESULT.effect]),
-    severity: extractNumberValue(list, ['Severity', ISSUE_FIELDS.ANALYSIS_RESULT.severity]),
-    occurrence: extractNumberValue(list, ['Occurrence', ISSUE_FIELDS.ANALYSIS_RESULT.occurrence]),
-    detection: extractNumberValue(list, ['Detection', ISSUE_FIELDS.ANALYSIS_RESULT.detection]),
+    failureMode: extractFieldValue(list, ISSUE_FIELDS.FAILURE_ANALYSIS.failureMode),
+    failureCause: extractFieldValue(list, ISSUE_FIELDS.FAILURE_ANALYSIS.failureCause),
+    failureCategory: extractFieldValue(list, ISSUE_FIELDS.FAILURE_ANALYSIS.failureCategory),
+    prevention: extractFieldValue(list, ISSUE_FIELDS.FAILURE_ANALYSIS.prevention),
+    detectionMethod: extractFieldValue(list, ISSUE_FIELDS.FAILURE_ANALYSIS.detectionMethod),
+    effect: extractFieldValue(list, ISSUE_FIELDS.FAILURE_ANALYSIS.effect),
+    severity: extractNumberValue(list, ISSUE_FIELDS.FAILURE_ANALYSIS.severity),
+    occurrence: extractNumberValue(list, ISSUE_FIELDS.FAILURE_ANALYSIS.occurrence),
+    detection: extractNumberValue(list, ISSUE_FIELDS.FAILURE_ANALYSIS.detection),
   };
 }
 
@@ -133,7 +134,7 @@ function parseCountermeasure(markdown) {
 }
 
 function buildIssueCreateUrl({ owner, repo, type, title, body }) {
-  const label = type === 'countermeasure' ? 'countermeasure' : 'analysis_result';
+  const label = type === 'countermeasure' ? 'countermeasure' : 'failure_analysis';
   const url = new URL(`https://github.com/${owner}/${repo}/issues/new`);
   url.searchParams.set('labels', label);
   url.searchParams.set('body', body ?? ISSUE_CREATE_BODIES[label]);
@@ -144,7 +145,7 @@ function buildIssueCreateUrl({ owner, repo, type, title, body }) {
 }
 
 function buildIssueCreateApiRequest({ owner, repo, type, title, body }) {
-  const label = type === 'countermeasure' ? 'countermeasure' : 'analysis_result';
+  const label = type === 'countermeasure' ? 'countermeasure' : 'failure_analysis';
   const url = new URL(
     `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`
   );
@@ -159,16 +160,16 @@ function buildIssueCreateApiRequest({ owner, repo, type, title, body }) {
   };
 }
 
-function addAnalysisIssueReference(body, issueNumber) {
+function addFailureAnalysisIssueReference(body, issueNumber) {
   if (issueNumber == null) {
     return body;
   }
-  return updateAnalysisIssueReferences(body, [issueNumber]);
+  return updateFailureAnalysisIssueReferences(body, [issueNumber]);
 }
 
-function getAnalysisIssueNumbers(body) {
+function getFailureAnalysisIssueNumbers(body) {
   const references = [...String(body || '').matchAll(
-    /^[ \t]*(?:[-*+][ \t]*)?(?:related[ \t]+)?analysis[ \t_-]*result(?:[ \t]+issue)?(?:[ \t]+number)?[ \t]*:[ \t]*([^\r\n]*)$/gim
+    /^[ \t]*(?:[-*+][ \t]*)?(?:related[ \t]+)?(?:failure[ \t_-]*analysis|analysis[ \t_-]*result)(?:[ \t]+issue)?(?:[ \t]+number)?[ \t]*:[ \t]*([^\r\n]*)$/gim
   )];
   return [...new Set(
     references.flatMap((reference) => [...reference[1].matchAll(/#?(\d+)/g)]
@@ -176,32 +177,32 @@ function getAnalysisIssueNumbers(body) {
   )];
 }
 
-function updateAnalysisIssueReferences(body, issueNumbers) {
+function updateFailureAnalysisIssueReferences(body, issueNumbers) {
   if (!Array.isArray(issueNumbers)
     || issueNumbers.some((number) => !Number.isInteger(number) || number < 1)) {
-    throw new Error('The analysis result issue number is invalid');
+    throw new Error('The failure analysis issue number is invalid');
   }
   const lines = String(body || '').split(/\r?\n/);
-  const existingReferences = getAnalysisIssueNumbers(body);
-  const referenceLine = /^[ \t]*(?:[-*+][ \t]*)?(?:related[ \t]+)?analysis[ \t_-]*result(?:[ \t]+issue)?(?:[ \t]+number)?[ \t]*:[ \t]*[^\r\n]*$/i;
+  const existingReferences = getFailureAnalysisIssueNumbers(body);
+  const referenceLine = /^[ \t]*(?:[-*+][ \t]*)?(?:related[ \t]+)?(?:failure[ \t_-]*analysis|analysis[ \t_-]*result)(?:[ \t]+issue)?(?:[ \t]+number)?[ \t]*:[ \t]*[^\r\n]*$/i;
   const content = lines.filter((line) => !referenceLine.test(line)).join('\n').trimEnd();
   const allIssueNumbers = [...new Set([...existingReferences, ...issueNumbers])].sort((a, b) => a - b);
   if (allIssueNumbers.length === 0) {
     return content;
   }
-  const reference = `Related analysis result: ${allIssueNumbers.map((number) => `#${number}`).join(', ')}`;
+  const reference = `Related failure analysis: ${allIssueNumbers.map((number) => `#${number}`).join(', ')}`;
   return `${content}${content ? '\n\n' : ''}${reference}`;
 }
 
-function groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues) {
-  const analysisByNumber = new Map(analysisIssues.map((issue) => [issue.number, issue]));
+function groupCountermeasuresByFailureAnalysis(failureAnalysisIssues, countermeasureIssues) {
+  const analysisByNumber = new Map(failureAnalysisIssues.map((issue) => [issue.number, issue]));
   const countermeasuresByNumber = new Map(
-    analysisIssues.map((issue) => [issue.number, []])
+    failureAnalysisIssues.map((issue) => [issue.number, []])
   );
   const unlinkedCountermeasures = [];
 
   for (const issue of countermeasureIssues) {
-    const associatedAnalysisNumbers = getAnalysisIssueNumbers(issue.body)
+    const associatedAnalysisNumbers = getFailureAnalysisIssueNumbers(issue.body)
       .filter((number) => analysisByNumber.has(number));
     if (associatedAnalysisNumbers.length === 0) {
       unlinkedCountermeasures.push(issue);
@@ -213,7 +214,7 @@ function groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues) {
   }
 
   return {
-    groups: analysisIssues.map((analysisIssue) => ({
+    groups: failureAnalysisIssues.map((analysisIssue) => ({
       analysisIssue,
       countermeasureIssues: countermeasuresByNumber.get(analysisIssue.number),
     })),
@@ -222,9 +223,11 @@ function groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues) {
 }
 
 function buildIssueListUrl({ owner, repo, type }) {
-  const label = type === 'countermeasure' ? 'countermeasure' : 'analysis_result';
+  const labelQuery = type === 'countermeasure'
+    ? 'label:"countermeasure"'
+    : 'label:failure_analysis,analysis_result';
   const url = new URL(`https://github.com/${owner}/${repo}/issues`);
-  url.searchParams.set('q', `label:"${label}"`);
+  url.searchParams.set('q', labelQuery);
   return url.toString();
 }
 
@@ -243,10 +246,11 @@ function getPullRequestIssueReferences(body, repoContext = null) {
   const currentOwner = repoContext?.owner?.toLowerCase();
   const currentRepo = repoContext?.repo?.toLowerCase();
   const referencePattern = /(?:(?<qualifiedOwner>[\w.-]+)\/(?<qualifiedRepo>[\w.-]+))?#(?<shortNumber>\d+)|https?:\/\/github\.com\/(?<urlOwner>[\w.-]+)\/(?<urlRepo>[\w.-]+)\/issues\/(?<urlNumber>\d+)/g;
-  const relationshipPattern = /^[ \t]*(?:[-*+][ \t]*)?(?:[*_`]*related[*_`]*[ \t]+[*_`]*to[*_`]*(?:[ \t]+(?<issueType>analysis[ \t_-]*result|countermeasure))?|close[sd]?|fix(?:es|ed)?|resolve[sd]?)\b[ \t]*:?[ \t]*(.+)$/gim;
+  const relationshipPattern = /^[ \t]*(?:[-*+][ \t]*)?(?:[*_`]*related[*_`]*[ \t]+[*_`]*to[*_`]*(?:[ \t]+(?<issueType>failure[ \t_-]*analysis|analysis[ \t_-]*result|countermeasure))?|close[sd]?|fix(?:es|ed)?|resolve[sd]?)\b[ \t]*:?[ \t]*(.+)$/gim;
   const description = String(body || '').replace(/<!--[\s\S]*?-->/g, '');
   for (const relationship of description.matchAll(relationshipPattern)) {
-    const issueType = relationship.groups.issueType?.toLowerCase().replace(/[ \t_-]+/g, ' ');
+    const matchedIssueType = relationship.groups.issueType?.toLowerCase().replace(/[ \t_-]+/g, ' ');
+    const issueType = matchedIssueType === 'analysis result' ? 'failure analysis' : matchedIssueType;
     for (const match of relationship[2].matchAll(referencePattern)) {
       const owner = match.groups.qualifiedOwner || match.groups.urlOwner;
       const repo = match.groups.qualifiedRepo || match.groups.urlRepo;
@@ -264,18 +268,18 @@ function getPullRequestIssueReferences(body, repoContext = null) {
 }
 
 function addPullRequestIssueReferences(body, issueNumbersByType, repoContext = null) {
-  const { analysisIssueNumbers, countermeasureIssueNumbers } = issueNumbersByType || {};
+  const { failureAnalysisIssueNumbers, countermeasureIssueNumbers } = issueNumbersByType || {};
   const validNumbers = (numbers) => Array.isArray(numbers)
     && numbers.every((number) => Number.isInteger(number) && number > 0);
-  if (!validNumbers(analysisIssueNumbers) || !validNumbers(countermeasureIssueNumbers)) {
+  if (!validNumbers(failureAnalysisIssueNumbers) || !validNumbers(countermeasureIssueNumbers)) {
     throw new Error('The pull request issue references are invalid');
   }
   const existingReferences = getPullRequestIssueReferences(body, repoContext);
   const hasTypedReference = (number, issueType) => existingReferences.some(
     (reference) => reference.number === number && reference.issueType === issueType
   );
-  const newAnalysisReferences = [...new Set(analysisIssueNumbers)]
-    .filter((number) => !hasTypedReference(number, 'analysis result'));
+  const newAnalysisReferences = [...new Set(failureAnalysisIssueNumbers)]
+    .filter((number) => !hasTypedReference(number, 'failure analysis'));
   const newCountermeasureReferences = [...new Set(countermeasureIssueNumbers)]
     .filter((number) => !hasTypedReference(number, 'countermeasure'));
   const content = String(body || '').trimEnd();
@@ -286,7 +290,7 @@ function addPullRequestIssueReferences(body, issueNumbersByType, repoContext = n
     return content;
   }
   const referenceLines = [
-    ...newAnalysisReferences.map((number) => `Related to analysis result #${number}`),
+    ...newAnalysisReferences.map((number) => `Related to failure analysis #${number}`),
     ...newCountermeasureReferences.map((number) => `Related to countermeasure #${number}`),
   ].join('\n');
   const additions = `${guidance}${referenceLines}`;
@@ -308,7 +312,7 @@ function buildIssueMapRows(analysisIssues, countermeasureIssues, pullRequests, r
   };
 
   for (const countermeasure of countermeasureIssues) {
-    for (const analysisNumber of getAnalysisIssueNumbers(countermeasure.body)) {
+    for (const analysisNumber of getFailureAnalysisIssueNumbers(countermeasure.body)) {
       addPair(analysisNumber, countermeasure.number);
     }
   }
@@ -368,14 +372,14 @@ function getRepoContextFromPath(pathname) {
 
 export {
   ISSUE_FIELDS,
-  parseAnalysisResult,
+  parseFailureAnalysis,
   parseCountermeasure,
   buildIssueCreateUrl,
   buildIssueCreateApiRequest,
-  addAnalysisIssueReference,
-  getAnalysisIssueNumbers,
-  updateAnalysisIssueReferences,
-  groupCountermeasuresByAnalysis,
+  addFailureAnalysisIssueReference,
+  getFailureAnalysisIssueNumbers,
+  updateFailureAnalysisIssueReferences,
+  groupCountermeasuresByFailureAnalysis,
   buildIssueListUrl,
   buildPullRequestCreateUrl,
   getPullRequestIssueNumbers,

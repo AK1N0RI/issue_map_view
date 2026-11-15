@@ -3,13 +3,14 @@ import {
   buildIssueCreateUrl,
   buildIssueListUrl,
   addPullRequestIssueReferences,
-  updateAnalysisIssueReferences,
+  updateFailureAnalysisIssueReferences,
 } from './lib/issue-map.js';
 
 const GITHUB_ISSUE_TYPE = {
-  ANALYSIS_RESULT: 'analysis_result',
+  FAILURE_ANALYSIS: 'failure_analysis',
   COUNTERMEASURE: 'countermeasure',
 };
+const LEGACY_FAILURE_ANALYSIS_LABEL = 'analysis_result';
 const ISSUE_MAP_CACHE_PREFIX = 'issueMapData:';
 const ISSUE_MAP_CACHE_TTL_MS = 5 * 60 * 1000;
 const issueMapDataRequests = new Map();
@@ -31,6 +32,13 @@ async function getGitHubPat() {
 
 function getIssueMapCacheKey(owner, repo) {
   return `${ISSUE_MAP_CACHE_PREFIX}${owner}/${repo}`;
+}
+
+function hasIssueTypeLabel(issue, type) {
+  const expectedLabels = type === GITHUB_ISSUE_TYPE.FAILURE_ANALYSIS
+    ? [GITHUB_ISSUE_TYPE.FAILURE_ANALYSIS, LEGACY_FAILURE_ANALYSIS_LABEL]
+    : [type];
+  return issue.labels?.some((label) => expectedLabels.includes(label.name?.toLowerCase()));
 }
 
 async function storeIssueMapDataCache(key, data) {
@@ -58,7 +66,7 @@ async function updateCachedIssueMapData(owner, repo, updater) {
 
 async function cacheCreatedIssue(owner, repo, issueType, issue) {
   await updateCachedIssueMapData(owner, repo, (data) => {
-    const target = issueType === GITHUB_ISSUE_TYPE.ANALYSIS_RESULT
+    const target = issueType === GITHUB_ISSUE_TYPE.FAILURE_ANALYSIS
       ? 'analysisIssues'
       : 'countermeasureIssues';
     const issues = (data[target] || []).filter((item) => item.number !== issue.number);
@@ -74,17 +82,14 @@ async function updateCachedIssue(owner, repo, issueNumber, issue) {
       ...(data.countermeasureIssues || []),
     ].find((item) => item.number === issueNumber);
     const updatedIssue = { ...existing, ...issue };
-    const hasLabel = (label) => updatedIssue.labels?.some(
-      (issueLabel) => issueLabel.name?.toLowerCase() === label
-    );
     const analysisIssues = (data.analysisIssues || [])
       .filter((item) => item.number !== issueNumber);
     const countermeasureIssues = (data.countermeasureIssues || [])
       .filter((item) => item.number !== issueNumber);
-    if (hasLabel(GITHUB_ISSUE_TYPE.ANALYSIS_RESULT)) {
+    if (hasIssueTypeLabel(updatedIssue, GITHUB_ISSUE_TYPE.FAILURE_ANALYSIS)) {
       analysisIssues.push(updatedIssue);
     }
-    if (hasLabel(GITHUB_ISSUE_TYPE.COUNTERMEASURE)) {
+    if (hasIssueTypeLabel(updatedIssue, GITHUB_ISSUE_TYPE.COUNTERMEASURE)) {
       countermeasureIssues.push(updatedIssue);
     }
     return { analysisIssues, countermeasureIssues };
@@ -232,11 +237,8 @@ async function fetchIssueMapData(message) {
 async function fetchFreshIssueMapData(message) {
   const githubPat = await getGitHubPat();
   const issues = await fetchRepositoryIssues(message.owner, message.repo, githubPat);
-  const hasLabel = (issue, label) => Array.isArray(issue.labels) && issue.labels.some(
-    (issueLabel) => typeof issueLabel.name === 'string' && issueLabel.name.toLowerCase() === label
-  );
-  const analysisIssues = issues.filter((issue) => hasLabel(issue, GITHUB_ISSUE_TYPE.ANALYSIS_RESULT));
-  const countermeasureIssues = issues.filter((issue) => hasLabel(issue, GITHUB_ISSUE_TYPE.COUNTERMEASURE));
+  const analysisIssues = issues.filter((issue) => hasIssueTypeLabel(issue, GITHUB_ISSUE_TYPE.FAILURE_ANALYSIS));
+  const countermeasureIssues = issues.filter((issue) => hasIssueTypeLabel(issue, GITHUB_ISSUE_TYPE.COUNTERMEASURE));
   return { analysisIssues, countermeasureIssues };
 }
 
@@ -414,23 +416,19 @@ async function linkCountermeasureIssues(message) {
     `${baseUrl}/${message.analysisIssueNumber}`,
     githubPat
   );
-  if (analysisIssue.pull_request || !analysisIssue.labels?.some(
-    (label) => label.name?.toLowerCase() === GITHUB_ISSUE_TYPE.ANALYSIS_RESULT
-  )) {
-    throw new Error(`Issue #${message.analysisIssueNumber} is not an analysis result`);
+  if (analysisIssue.pull_request || !hasIssueTypeLabel(analysisIssue, GITHUB_ISSUE_TYPE.FAILURE_ANALYSIS)) {
+    throw new Error(`Issue #${message.analysisIssueNumber} is not a failure analysis`);
   }
 
   const linkedIssueNumbers = [];
   for (const issueNumber of countermeasureIssueNumbers) {
     try {
       const { data: issue } = await fetchGitHubApi(`${baseUrl}/${issueNumber}`, githubPat);
-      if (issue.pull_request || !issue.labels?.some(
-        (label) => label.name?.toLowerCase() === GITHUB_ISSUE_TYPE.COUNTERMEASURE
-      )) {
+      if (issue.pull_request || !hasIssueTypeLabel(issue, GITHUB_ISSUE_TYPE.COUNTERMEASURE)) {
         throw new Error(`Issue #${issueNumber} is not a countermeasure`);
       }
 
-      const body = updateAnalysisIssueReferences(issue.body || '', [message.analysisIssueNumber]);
+      const body = updateFailureAnalysisIssueReferences(issue.body || '', [message.analysisIssueNumber]);
       let updatedIssue = issue;
       if (body !== (issue.body || '')) {
         const response = await fetch(`${baseUrl}/${issueNumber}`, {
@@ -474,12 +472,12 @@ async function linkPullRequestIssues(message) {
     && numbers.every((number) => Number.isInteger(number) && number > 0);
   if (!isValidRepoSegment(message.owner) || !isValidRepoSegment(message.repo)
     || !Number.isInteger(message.pullRequestNumber) || message.pullRequestNumber < 1
-    || !validNumbers(message.analysisIssueNumbers)
+    || !validNumbers(message.failureAnalysisIssueNumbers)
     || !validNumbers(message.countermeasureIssueNumbers)) {
     throw new Error('The pull request linking data is invalid');
   }
 
-  const analysisIssueNumbers = [...new Set(message.analysisIssueNumbers)];
+  const analysisIssueNumbers = [...new Set(message.failureAnalysisIssueNumbers)];
   const countermeasureIssueNumbers = [...new Set(message.countermeasureIssueNumbers)];
   const githubPat = await getGitHubPat();
   const baseUrl = `https://api.github.com/repos/${encodeURIComponent(message.owner)}/${encodeURIComponent(message.repo)}`;
@@ -487,18 +485,14 @@ async function linkPullRequestIssues(message) {
     fetchGitHubApi(`${baseUrl}/pulls/${message.pullRequestNumber}`, githubPat),
     Promise.all(analysisIssueNumbers.map(async (issueNumber) => {
       const { data: issue } = await fetchGitHubApi(`${baseUrl}/issues/${issueNumber}`, githubPat);
-      if (issue.pull_request || !issue.labels?.some(
-        (label) => label.name?.toLowerCase() === GITHUB_ISSUE_TYPE.ANALYSIS_RESULT
-      )) {
-        throw new Error(`Issue #${issueNumber} is not an analysis result`);
+      if (issue.pull_request || !hasIssueTypeLabel(issue, GITHUB_ISSUE_TYPE.FAILURE_ANALYSIS)) {
+        throw new Error(`Issue #${issueNumber} is not a failure analysis`);
       }
       return issue;
     })),
     Promise.all(countermeasureIssueNumbers.map(async (issueNumber) => {
       const { data: issue } = await fetchGitHubApi(`${baseUrl}/issues/${issueNumber}`, githubPat);
-      if (issue.pull_request || !issue.labels?.some(
-        (label) => label.name?.toLowerCase() === GITHUB_ISSUE_TYPE.COUNTERMEASURE
-      )) {
+      if (issue.pull_request || !hasIssueTypeLabel(issue, GITHUB_ISSUE_TYPE.COUNTERMEASURE)) {
         throw new Error(`Issue #${issueNumber} is not a countermeasure`);
       }
       return issue;
@@ -509,7 +503,7 @@ async function linkPullRequestIssues(message) {
   }
 
   const body = addPullRequestIssueReferences(pullRequest.body || '', {
-    analysisIssueNumbers: analysisResults.map((issue) => issue.number),
+    failureAnalysisIssueNumbers: analysisResults.map((issue) => issue.number),
     countermeasureIssueNumbers: countermeasures.map((issue) => issue.number),
   }, { owner: message.owner, repo: message.repo });
   let updatedPullRequest = pullRequest;
@@ -543,7 +537,7 @@ async function linkPullRequestIssues(message) {
   return {
     pullRequestNumber: updatedPullRequest.number,
     pullRequest: updatedPullRequest,
-    linkedAnalysisIssueNumbers: analysisIssueNumbers,
+    linkedFailureAnalysisIssueNumbers: analysisIssueNumbers,
     linkedCountermeasureIssueNumbers: countermeasureIssueNumbers,
   };
 }
@@ -570,7 +564,7 @@ async function createIssue(message) {
   if (!isValidRepoSegment(message.owner) || !isValidRepoSegment(message.repo)) {
     throw new Error('Repository information is invalid');
   }
-  if (message.issueType !== GITHUB_ISSUE_TYPE.ANALYSIS_RESULT
+  if (message.issueType !== GITHUB_ISSUE_TYPE.FAILURE_ANALYSIS
     && message.issueType !== GITHUB_ISSUE_TYPE.COUNTERMEASURE) {
     throw new Error('The issue type is invalid');
   }
@@ -626,7 +620,7 @@ async function createIssue(message) {
 function openIssuePage(type, owner, repo) {
   const url = type === GITHUB_ISSUE_TYPE.COUNTERMEASURE
     ? buildIssueListUrl({ owner, repo, type: GITHUB_ISSUE_TYPE.COUNTERMEASURE })
-    : buildIssueListUrl({ owner, repo, type: GITHUB_ISSUE_TYPE.ANALYSIS_RESULT });
+    : buildIssueListUrl({ owner, repo, type: GITHUB_ISSUE_TYPE.FAILURE_ANALYSIS });
   return chrome.tabs.create({ url });
 }
 

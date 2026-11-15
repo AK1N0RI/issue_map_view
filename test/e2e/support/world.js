@@ -91,7 +91,7 @@ class IssueMapWorld {
     await this.page.addScriptTag({ path: path.join(projectRoot, 'src/content.js') });
     await this.page.getByRole('tab', { name: 'Issues Map' }).click();
     await this.page.locator('#issue-map-view-table tbody tr').first().waitFor();
-    await this.page.getByText(/\d+ analysis results,/).waitFor();
+    await this.page.getByText(/\d+ failure analyses,/).waitFor();
   }
 
   async openRepositoryPageWithoutPullRequestsNavigation() {
@@ -177,7 +177,7 @@ class IssueMapWorld {
                 labels: [{ name: message.issueType }],
                 html_url: `https://github.com/${message.owner}/${message.repo}/issues/${state().nextIssueNumber - 1}`,
               };
-              state()[message.issueType === 'analysis_result' ? 'analysisIssues' : 'countermeasureIssues']
+              state()[message.issueType === 'failure_analysis' ? 'analysisIssues' : 'countermeasureIssues']
                 .push(issue);
               return { ok: true, issueNumber: issue.number, issueUrl: issue.html_url };
             }
@@ -188,9 +188,9 @@ class IssueMapWorld {
                 return { ok: false, error: 'Pull request not found' };
               }
               const numbers = [
-                ...message.analysisIssueNumbers.map((number) => ({
+                ...message.failureAnalysisIssueNumbers.map((number) => ({
                   number,
-                  issueType: 'analysis result',
+                  issueType: 'failure analysis',
                 })),
                 ...message.countermeasureIssueNumbers.map((number) => ({
                   number,
@@ -208,7 +208,7 @@ class IssueMapWorld {
                 const guidance = pullRequest.body.includes('<!-- Issue Map relationship guidance')
                   ? ''
                   : '<!-- Issue Map relationship guidance\n'
-                    + '"Related to analysis result #<number>" links an Analysis Result.\n'
+                    + '"Related to failure analysis #<number>" links a Failure Analysis.\n'
                     + '"Related to countermeasure #<number>" links a Countermeasure.\n'
                     + 'Add one reference per line. This optional note can be removed.\n'
                     + '-->\n';
@@ -220,7 +220,7 @@ class IssueMapWorld {
                 ok: true,
                 pullRequestNumber: pullRequest.number,
                 pullRequest: structuredClone(pullRequest),
-                linkedAnalysisIssueNumbers: message.analysisIssueNumbers,
+                linkedFailureAnalysisIssueNumbers: message.failureAnalysisIssueNumbers,
                 linkedCountermeasureIssueNumbers: message.countermeasureIssueNumbers,
               };
             }
@@ -228,7 +228,7 @@ class IssueMapWorld {
               for (const number of message.countermeasureIssueNumbers) {
                 const issue = state().countermeasureIssues.find((item) => item.number === number);
                 if (issue && !issue.body.includes(`#${message.analysisIssueNumber}`)) {
-                  issue.body += `\n\nRelated analysis result: #${message.analysisIssueNumber}`;
+                  issue.body += `\n\nRelated failure analysis: #${message.analysisIssueNumber}`;
                 }
               }
               return {
@@ -247,15 +247,15 @@ class IssueMapWorld {
   setLinkedIssues({ analysisNumbers = [2], countermeasureNumber = 10, pullRequestNumber = 20 }) {
     this.fixtures.analysisIssues = analysisNumbers.map((number) => createIssue(
       number,
-      `Analysis result ${number}`,
-      'analysis_result',
-      `### analysis result\n* Failure Mode: Failure mode ${number}\n* Severity: 8`
+      `Failure Analysis ${number}`,
+      'failure_analysis',
+      `### failure analysis\n* Failure Mode: Failure mode ${number}\n* Severity: 8`
     ));
     this.fixtures.countermeasureIssues = [createIssue(
       countermeasureNumber,
       `Countermeasure ${countermeasureNumber}`,
       'countermeasure',
-      `### countermeasure\n* Content: Countermeasure content\n* Effect(Effect): Improved reliability\n* RPN: 16\n* Related analysis result: ${analysisNumbers.map((number) => `#${number}`).join(', ')}`
+      `### countermeasure\n* Content: Countermeasure content\n* Effect(Effect): Improved reliability\n* RPN: 16\n* Related failure analysis: ${analysisNumbers.map((number) => `#${number}`).join(', ')}`
     )];
     this.fixtures.pullRequests = [{
       number: pullRequestNumber,

@@ -5,7 +5,7 @@ Items marked with `*` describe external behavior. Items marked with `**` describ
 
 ## Navigation
 
-* The extension provides a spreadsheet-like table for FMEA, consisting of Analysis Result and Countermeasure columns.
+* The extension provides a spreadsheet-like table for FMEA, consisting of Failure Analysis and Countermeasure columns.
 * An "Issues Map" menu item is added beside the Code and Issues tabs on GitHub repository pages.
 * Selecting Issues Map displays it as a standalone view while preserving repository navigation; it is not appended below the existing repository page.
 * Browser back and forward navigation returns to the previous view, and opening the URL directly displays the same view.
@@ -17,27 +17,28 @@ Items marked with `*` describe external behavior. Items marked with `**` describ
 
 ## Issue Map
 
-* Display Analysis Results, Countermeasures, and pull requests in a spreadsheet-like table styled like GitHub's issue pages, with approximately two-thirds of their font size.
+* Display Failure Analyses, Countermeasures, and pull requests in a spreadsheet-like table styled like GitHub's issue pages, with approximately two-thirds of their font size.
 * Keep each table column fixed at 100px wide. Row height grows with wrapped content up to eight lines; longer cell text is truncated with an ellipsis, and hovering over the cell displays its full text in a tooltip.
-* The first row contains the columns "Analysis Result Number", "Analysis Result", "Countermeasure Number", "Countermeasure", and "PR".
-* The second row contains field headings. Analysis Result fields are "Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", and "Detection". Countermeasure fields are "Content", "Effect(Effect)", "Effect(Occurrence)", "Effect(Detection)", and "RPN".
-* Starting with the third row, cells display values parsed from each GitHub issue body. If the Analysis Result's Failure Mode or Countermeasure's Content is missing, display the issue title instead.
+* The first row contains the columns "Failure Analysis Number", "Failure Analysis", "Countermeasure Number", "Countermeasure", and "PR".
+* The second row contains field headings. Failure Analysis fields are "Failure Mode", "Failure Cause", "Failure Classification", "Preventive Measure", "Detection Method", "Effect", "Severity", "Occurrence", and "Detection". Countermeasure fields are "Content", "Effect(Effect)", "Effect(Occurrence)", "Effect(Detection)", and "RPN".
+* Starting with the third row, cells display values parsed from each GitHub issue body. If the Failure Analysis's Failure Mode or Countermeasure's Content is missing, display the issue title instead.
 * Display each issue number as a link. Selecting it opens the issue drawer without navigating away. The drawer displays the title, body, labels, assignees, Projects v2, milestone, and change history. The title, body, labels, assignees, Projects v2, and milestone can be edited and saved.
-* Link Countermeasures to Analysis Results using issue numbers in the Countermeasure body after `Related analysis result:`. Do not infer relationships from issue number order or row position. Multiple issue numbers may be separated by commas, semicolons, spaces, or hyphens. Display a Countermeasure in the row of every referenced Analysis Result. Multiple Countermeasures may link to one Analysis Result. Countermeasures with no valid existing references appear in standalone rows with an empty Analysis Result cell.
-* Associate PRs with issues by explicit relationship references in the PR description, such as `Closes #2`, `Fixes #2`, `Resolves #2`, `Related to analysis result #2`, or `Related to countermeasure #3`. Multiple references can appear on one line. Ignore unrelated `#<number>` mentions and explicitly qualified references to other repositories. A PR can reference multiple Analysis Results and Countermeasures. Display one row for every Analysis Result–Countermeasure–PR combination referenced by the PR, repeating each issue and PR as necessary. Preserve the existing Analysis Result-to-Countermeasure relationship when no PR reference is present.
-* Display this warning above the Issue Map: "Countermeasures and PRs are expected to have a 1:1 relationship. A PR linked to multiple Countermeasures is repeated for each Analysis Result–Countermeasure combination."
-* The PR column displays a link to each associated PR. Empty PR cells provide "Create new" and "Link" actions. "Create new" opens GitHub's compare page in a new tab. "Link" opens a drawer where users select an existing PR and one or more Analysis Results and Countermeasures; save the selections by appending `Related to analysis result #<number>` and `Related to countermeasure #<number>` references to the PR description, preserving existing references. Add a short optional HTML comment explaining this relationship syntax; users may remove the comment without affecting relationship parsing.
-* The "Link" button opens a GitHub-styled drawer listing issues labeled `countermeasure`. Select the Analysis Result and one or more Countermeasures, then choose "Link selected countermeasures" to save the Analysis Result issue number in each selected Countermeasure body. Preserve existing links, remove duplicates, and sort numbers in ascending order using the format `Related analysis result: #2, #4`. When opened from a row, preselect that row's Analysis Result.
+* Link Countermeasures to Failure Analyses using issue numbers in the Countermeasure body after `Related failure analysis:`. Do not infer relationships from issue number order or row position. Multiple issue numbers may be separated by commas, semicolons, spaces, or hyphens. Display a Countermeasure in the row of every referenced Failure Analysis. Multiple Countermeasures may link to one Failure Analysis. Countermeasures with no valid existing references appear in standalone rows with an empty Failure Analysis cell.
+* Associate PRs with issues by explicit relationship references in the PR description, such as `Closes #2`, `Fixes #2`, `Resolves #2`, `Related to failure analysis #2`, or `Related to countermeasure #3`. Multiple references can appear on one line. Ignore unrelated `#<number>` mentions and explicitly qualified references to other repositories. A PR can reference multiple Failure Analyses and Countermeasures. Display one row for every Failure Analysis–Countermeasure–PR combination referenced by the PR, repeating each issue and PR as necessary. Preserve the existing Failure Analysis-to-Countermeasure relationship when no PR reference is present.
+* Display this warning above the Issue Map: "Countermeasures and PRs are expected to have a 1:1 relationship. A PR linked to multiple Countermeasures is repeated for each Failure Analysis–Countermeasure combination."
+* The PR column displays a link to each associated PR. Empty PR cells provide "Create new" and "Link" actions. "Create new" opens GitHub's compare page in a new tab. "Link" opens a drawer where users select an existing PR and one or more Failure Analyses and Countermeasures; save the selections by appending `Related to failure analysis #<number>` and `Related to countermeasure #<number>` references to the PR description, preserving existing references. Add a short optional HTML comment explaining this relationship syntax; users may remove the comment without affecting relationship parsing.
+* The "Link" button opens a GitHub-styled drawer listing issues labeled `countermeasure`. Select the Failure Analysis and one or more Countermeasures, then choose "Link selected countermeasures" to save the Failure Analysis issue number in each selected Countermeasure body. Preserve existing links, remove duplicates, and sort numbers in ascending order using the format `Related failure analysis: #2, #4`. When opened from a row, preselect that row's Failure Analysis.
 
-### Analysis Results
+### Failure Analyses
 
-* Each Analysis Result is a GitHub issue labeled `analysis_result`.
+* Each Failure Analysis is a GitHub issue labeled `failure_analysis`.
 * Each Countermeasure is a GitHub issue labeled `countermeasure`.
-* Create the `analysis_result` and `countermeasure` labels in the repository before using issue creation.
-* Analysis Result issues use a `### analysis result` heading and fields such as:
+* Create the `failure_analysis` and `countermeasure` labels in the repository before using issue creation.
+* Continue recognizing issues labeled `analysis_result`, `### analysis result` headings, and legacy `Related analysis result` references so existing repositories remain compatible. New issues and links use the Failure Analysis name and syntax.
+* Failure Analysis issues use a `### failure analysis` heading and fields such as:
 
 ```markdown
-### analysis result
+### failure analysis
 * Failure Mode: the motor does not start
 * Failure Cause: a component is damaged
 * Failure Classification: mechanical failure
@@ -65,21 +66,21 @@ Items marked with `*` describe external behavior. Items marked with `**` describ
 
 ### Listing and issue actions
 
-* Initially, both Analysis Result and Countermeasure columns are visible and empty. Empty cells provide "Create new" and "Link" actions.
+* Initially, both Failure Analysis and Countermeasure columns are visible and empty. Empty cells provide "Create new" and "Link" actions.
 * Display a top-level "Create new" button for each issue type regardless of whether matching issues already exist.
 * If one issue type has more issues than the other, show a "Create new" action in each unmatched row.
-* Do not show a manual refresh button. Fetch issues and pull requests from the GitHub REST API with a fine-grained PAT and categorize issues by the `analysis_result` and `countermeasure` labels. Cache issues for five minutes in the browser session, but fetch pull requests when loading the map and again when returning to its browser tab so edited PR references are reflected promptly. Update the cache after issue creation, editing, and linking so changes appear immediately. After a successful issue edit, update the affected row from the returned issue data instead of re-fetching the full issue list. Skip Projects v2 GraphQL calls on save when the project selection is unchanged. If listing issues or pull requests fails, show the error and keep the top-level creation buttons available.
+* Do not show a manual refresh button. Fetch issues and pull requests from the GitHub REST API with a fine-grained PAT and categorize issues by the `failure_analysis` and `countermeasure` labels. Cache issues for five minutes in the browser session, but fetch pull requests when loading the map and again when returning to its browser tab so edited PR references are reflected promptly. Update the cache after issue creation, editing, and linking so changes appear immediately. After a successful issue edit, update the affected row from the returned issue data instead of re-fetching the full issue list. Skip Projects v2 GraphQL calls on save when the project selection is unchanged. If listing issues or pull requests fails, show the error and keep the top-level creation buttons available.
 * Selecting "Create new" opens an issue creation form in the drawer. The title and body are editable. Create the issue through the GitHub REST API with the appropriate label and show success without navigating away. Authenticate with a fine-grained PAT that has Issues: Read and write permission for the target repository; keep it only for the browser session.
 * The Issue Map's "Link" action opens a drawer for linking issues instead of navigating to GitHub's issue list.
 * The "Create pull request" action opens GitHub's compare page in a new tab. The "Link" action opens the PR linking drawer.
 
-### Creating Analysis Result issues
+### Creating Failure Analysis issues
 
-* Selecting "Create new" in the Analysis Result column opens the issue creation form in a drawer with the `analysis_result` label applied.
+* Selecting "Create new" in the Failure Analysis column opens the issue creation form in a drawer with the `failure_analysis` label applied.
 * The default body is:
 
 ```markdown
-### analysis result
+### failure analysis
 <!-- do not edit predefined fields -->
 * Failure Mode: <!-- insert failure mode -->
 * Failure Cause: <!-- insert failure cause -->
@@ -94,7 +95,7 @@ Items marked with `*` describe external behavior. Items marked with `**` describ
 
 ### Creating Countermeasure issues
 
-* Selecting "Create new" in an Analysis Result row opens the Countermeasure creation form in a drawer and adds that Analysis Result number to the body as `Related analysis result: #<issue number>`. Top-level creation and any creation not associated with a specific Analysis Result omit this reference.
+* Selecting "Create new" in a Failure Analysis row opens the Countermeasure creation form in a drawer and adds that Failure Analysis number to the body as `Related failure analysis: #<issue number>`. Top-level creation and any creation not associated with a specific Failure Analysis omit this reference.
 * Selecting "Create new" in the Countermeasure column opens the issue creation form in a drawer with the `countermeasure` label applied.
 * The default body is:
 

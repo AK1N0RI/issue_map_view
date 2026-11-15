@@ -2,7 +2,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { createIssue } from '../support/world.js';
 
-Given('the repository has Analysis Result issue {int} and Countermeasure issue {int} linked to it', function (analysisNumber, countermeasureNumber) {
+Given('the repository has Failure Analysis issue {int} and Countermeasure issue {int} linked to it', function (analysisNumber, countermeasureNumber) {
   this.setLinkedIssues({ analysisNumbers: [analysisNumber], countermeasureNumber });
 });
 
@@ -14,58 +14,58 @@ Given('pull request {int} references issues {int} and {int}', function (pullRequ
   });
 });
 
-Given('the repository has Analysis Results {int} and {int} and Countermeasure {int} linked to both', function (firstAnalysisNumber, secondAnalysisNumber, countermeasureNumber) {
+Given('the repository has Failure Analyses {int} and {int} and Countermeasure {int} linked to both', function (firstAnalysisNumber, secondAnalysisNumber, countermeasureNumber) {
   this.fixtures.analysisIssues = [firstAnalysisNumber, secondAnalysisNumber].map((number) => createIssue(
     number,
-    `Analysis result ${number}`,
-    'analysis_result',
-    `### analysis result\n* Failure Mode: Failure mode ${number}\n* Severity: 8`
+    `Failure Analysis ${number}`,
+    'failure_analysis',
+    `### failure analysis\n* Failure Mode: Failure mode ${number}\n* Severity: 8`
   ));
   this.fixtures.countermeasureIssues = [createIssue(
     countermeasureNumber,
     `Countermeasure ${countermeasureNumber}`,
     'countermeasure',
-    `### countermeasure\n* Content: Countermeasure content\n* Effect(Effect): Improved reliability\n* RPN: 16\n* Related analysis result: #${firstAnalysisNumber}, #${secondAnalysisNumber}`
+    `### countermeasure\n* Content: Countermeasure content\n* Effect(Effect): Improved reliability\n* RPN: 16\n* Related failure analysis: #${firstAnalysisNumber}, #${secondAnalysisNumber}`
   )];
 });
 
-Given('Analysis Result issue {int} has a long Failure Mode', function (issueNumber) {
+Given('Failure Analysis issue {int} has a long Failure Mode', function (issueNumber) {
   const issue = this.fixtures.analysisIssues.find((item) => item.number === issueNumber);
-  assert.ok(issue, `Analysis Result issue #${issueNumber} is not in the fixture`);
-  issue.body = `### analysis result\n* Failure Mode: ${'A long failure mode sentence that wraps into many lines. '.repeat(12)}\n* Severity: 8`;
+  assert.ok(issue, `Failure Analysis issue #${issueNumber} is not in the fixture`);
+  issue.body = `### failure analysis\n* Failure Mode: ${'A long failure mode sentence that wraps into many lines. '.repeat(12)}\n* Severity: 8`;
 });
 
 Given('pull request {int} references issues {int}, {int}, and {int}', function (pullRequestNumber, firstAnalysis, secondAnalysis, countermeasure) {
   this.fixtures.pullRequests = [{
     number: pullRequestNumber,
     title: `Pull request ${pullRequestNumber}`,
-    body: `Related to analysis result #${firstAnalysis}\nRelated to analysis result #${secondAnalysis}\nRelated to countermeasure #${countermeasure}`,
+    body: `Related to failure analysis #${firstAnalysis}\nRelated to failure analysis #${secondAnalysis}\nRelated to countermeasure #${countermeasure}`,
     html_url: `https://github.com/octo-org/demo-repo/pull/${pullRequestNumber}`,
   }];
 });
 
-Given('the repository has Analysis Result issue {int} and Countermeasures {int} and {int} linked to it', function (analysisNumber, firstCountermeasure, secondCountermeasure) {
+Given('the repository has Failure Analysis issue {int} and Countermeasures {int} and {int} linked to it', function (analysisNumber, firstCountermeasure, secondCountermeasure) {
   this.fixtures.analysisIssues = [createIssue(
     analysisNumber,
-    `Analysis result ${analysisNumber}`,
-    'analysis_result',
-    `### analysis result\n* Failure Mode: Failure mode ${analysisNumber}\n* Severity: 8`
+    `Failure Analysis ${analysisNumber}`,
+    'failure_analysis',
+    `### failure analysis\n* Failure Mode: Failure mode ${analysisNumber}\n* Severity: 8`
   )];
   this.fixtures.countermeasureIssues = [firstCountermeasure, secondCountermeasure].map((number) => (
     createIssue(
       number,
       `Countermeasure ${number}`,
       'countermeasure',
-      `### countermeasure\n* Content: Countermeasure content ${number}\n* Related analysis result: #${analysisNumber}`
+      `### countermeasure\n* Content: Countermeasure content ${number}\n* Related failure analysis: #${analysisNumber}`
     )
   ));
 });
 
-Given('pull request {int} references Analysis Result {int} and Countermeasures {int} and {int}', function (pullRequestNumber, analysisNumber, firstCountermeasure, secondCountermeasure) {
+Given('pull request {int} references Failure Analysis {int} and Countermeasures {int} and {int}', function (pullRequestNumber, analysisNumber, firstCountermeasure, secondCountermeasure) {
   this.fixtures.pullRequests = [{
     number: pullRequestNumber,
     title: `Pull request ${pullRequestNumber}`,
-    body: `Related to analysis result #${analysisNumber}\nRelated to countermeasure #${firstCountermeasure}\nRelated to countermeasure #${secondCountermeasure}`,
+    body: `Related to failure analysis #${analysisNumber}\nRelated to countermeasure #${firstCountermeasure}\nRelated to countermeasure #${secondCountermeasure}`,
     html_url: `https://github.com/octo-org/demo-repo/pull/${pullRequestNumber}`,
   }];
 });
@@ -98,12 +98,12 @@ When('I go back to the repository page', async function () {
   await this.page.goBack();
 });
 
-When('I edit Analysis Result issue {int} from its number link', async function (issueNumber) {
+When('I edit Failure Analysis issue {int} from its number link', async function (issueNumber) {
   await this.page.locator(`a[aria-label*="(#${issueNumber})"]`).click();
   const drawer = this.page.getByRole('dialog', { name: `Issue #${issueNumber} details` });
   await drawer.getByRole('textbox', { name: 'Issue title' }).fill('Updated analysis title');
   await drawer.getByRole('textbox', { name: 'Issue body' }).fill(
-    '### analysis result\n* Failure Mode: Updated failure mode\n* Severity: 8'
+    '### failure analysis\n* Failure Mode: Updated failure mode\n* Severity: 8'
   );
   const fetchCountsBeforeSave = await this.page.evaluate(() => ({
     issueMap: window.__issueMapTestState.issueMapFetchCount,
@@ -153,13 +153,13 @@ When('I link the pull request in the map to the displayed issues', async functio
   const updatedBody = await this.page.evaluate(
     () => window.__issueMapTestState.pullRequests[0].body
   );
-  assert.match(updatedBody, /Related to analysis result #2/);
+  assert.match(updatedBody, /Related to failure analysis #2/);
   assert.match(updatedBody, /Related to countermeasure #10/);
   assert.match(updatedBody, /<!-- Issue Map relationship guidance/);
   assert.match(updatedBody, /Related to countermeasure #<number>/);
 });
 
-Then('the Analysis Result, Countermeasure, and pull request are shown in one row', async function () {
+Then('the Failure Analysis, Countermeasure, and pull request are shown in one row', async function () {
   const row = this.page.locator('#issue-map-view-table tbody tr').filter({ hasText: '#20' });
   await row.waitFor();
   assert.match(await row.innerText(), /Failure mode 2/);
@@ -202,7 +202,7 @@ Then('removed Countermeasure fields are not displayed', async function () {
   }
 });
 
-Then('pull request {int} is shown once for Analysis Result {int} and once for Analysis Result {int}', async function (pullRequestNumber, firstAnalysis, secondAnalysis) {
+Then('pull request {int} is shown once for Failure Analysis {int} and once for Failure Analysis {int}', async function (pullRequestNumber, firstAnalysis, secondAnalysis) {
   const rows = this.page.locator('#issue-map-view-table tbody tr').filter({ hasText: `#${pullRequestNumber}` });
   assert.equal(await rows.count(), 2);
   const rowText = await rows.allInnerTexts();

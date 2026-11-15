@@ -12,7 +12,7 @@ const projectDirectory = path.resolve(testDirectory, '../..');
 const repository = { owner: 'AK1N0RI', name: 'issue_map_test' };
 const repositoryUrl = `https://github.com/${repository.owner}/${repository.name}`;
 const titlePrefix = '[Issue Map live E2E]';
-const analysisBody = `### analysis result
+const analysisBody = `### failure analysis
 * Failure Mode: Live E2E failure mode
 * Failure Cause: Live E2E test fixture
 * Failure Classification: Test
@@ -41,7 +41,7 @@ async function openIssueMap(page) {
   await page.getByRole('tab', { name: 'Issues Map' }).waitFor({ timeout: 30000 });
   await page.getByRole('tab', { name: 'Issues Map' }).click();
   await page.locator('#issue-map-view-table').waitFor();
-  await page.getByText(/\d+ analysis results,/).waitFor();
+  await page.getByText(/\d+ failure analyses,/).waitFor();
 }
 
 async function createIssueFromDrawer(page, { type, title, body, trigger }) {
@@ -49,7 +49,7 @@ async function createIssueFromDrawer(page, { type, title, body, trigger }) {
   await createAction.waitFor();
   await createAction.click();
   const drawer = page.getByRole('dialog', {
-    name: type === 'analysis_result' ? 'Create an analysis result' : 'Create a countermeasure',
+    name: type === 'failure_analysis' ? 'Create a failure analysis' : 'Create a countermeasure',
   });
   await drawer.getByRole('textbox', { name: 'Issue title' }).fill(title);
   const bodyInput = drawer.getByRole('textbox', { name: 'Issue body' });
@@ -110,13 +110,13 @@ When('I open the Issues Map in the dedicated repository', async function () {
   await openIssueMap(this.page);
 });
 
-When('I create a marked Analysis Result and its linked Countermeasure', async function () {
+When('I create a marked Failure Analysis and its linked Countermeasure', async function () {
   this.runMarker = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   this.analysisTitle = `${titlePrefix} Analysis ${this.runMarker}`;
   this.countermeasureTitle = `${titlePrefix} Countermeasure ${this.runMarker}`;
 
   this.analysis = await createIssueFromDrawer(this.page, {
-    type: 'analysis_result',
+    type: 'failure_analysis',
     title: this.analysisTitle,
     body: analysisBody,
   });
@@ -138,14 +138,14 @@ When('I create a marked Analysis Result and its linked Countermeasure', async fu
   });
   assert.ok(
     this.countermeasure.submittedBody.includes(`#${this.analysis.issueNumber}`),
-    'The Countermeasure template should reference the created Analysis Result'
+    'The Countermeasure template should reference the created Failure Analysis'
   );
   await this.page.locator(
     `#issue-map-view-table a[aria-label*="${this.countermeasureTitle}"]`
   ).waitFor({ timeout: 30000 });
 
   await this.attach([
-    `Analysis Result: ${this.analysis.issueUrl}`,
+    `Failure Analysis: ${this.analysis.issueUrl}`,
     `Countermeasure: ${this.countermeasure.issueUrl}`,
   ].join('\n'));
 });

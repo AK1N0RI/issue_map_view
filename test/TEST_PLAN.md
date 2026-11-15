@@ -10,7 +10,7 @@ Location: `test/module/`
 
 Run with `npm run test:module`. Test-only dependencies are installed in `test/node_modules`, separate from the extension source. The root test runner creates that dependency environment on first use.
 
-Use Node's built-in test runner to verify isolated parsing, URL generation, relationship-reference handling, and row construction. Fixtures cover markdown variations, malformed or unrelated references, duplicate references, multiple Analysis Result–Countermeasure–PR combinations, and standalone issues.
+Use Node's built-in test runner to verify isolated parsing, URL generation, relationship-reference handling, and row construction. Fixtures cover markdown variations, legacy Analysis Result compatibility, malformed or unrelated references, duplicate references, multiple Failure Analysis–Countermeasure–PR combinations, and standalone issues.
 
 These tests are fast, deterministic, and do not require a browser or network access. Add module tests when changing pure utilities or API request construction.
 
@@ -24,8 +24,8 @@ Gherkin scenarios in `e2e/features/` are executed by Cucumber and drive a real C
 
 Scenarios are derived from `spec.md` and cover:
 
-- Issues Map navigation and display of parsed Analysis Result and Countermeasure fields.
-- One row for each referenced Analysis Result–Countermeasure–PR combination.
+- Issues Map navigation and display of parsed Failure Analysis and Countermeasure fields.
+- One row for each referenced Failure Analysis–Countermeasure–PR combination.
 - The PR 1:1 relationship warning and omission of removed Countermeasure fields.
 - Countermeasure creation through the drawer and automatic map refresh.
 - Selecting an existing PR and linking issues through the drawer.
@@ -36,7 +36,7 @@ The test runner provisions the Playwright Chromium browser on first E2E executio
 
 Location: `test/e2etest/`.
 
-Run explicitly with `npm run test:live`. This is not included in `npm test`; it launches the installed Google Chrome application, loads the current unpacked extension source in an isolated temporary profile, and uses the real GitHub API against the dedicated `AK1N0RI/issue_map_test` repository. A test creates marked Analysis Result and Countermeasure issues and adds their references to a pull request number entered by the operator. Test-created issues and the PR description change are retained for manual cleanup.
+Run explicitly with `npm run test:live`. This is not included in `npm test`; it launches the installed Google Chrome application, loads the current unpacked extension source in an isolated temporary profile, and uses the real GitHub API against the dedicated `AK1N0RI/issue_map_test` repository. A test creates marked Failure Analysis and Countermeasure issues and adds their references to a pull request number entered by the operator. Test-created issues and the PR description change are retained for manual cleanup.
 
 GitHub sign-in is performed manually in the visible browser. The PAT is entered at a hidden terminal prompt and then into the extension options page; neither credential is stored in the repository or report. The temporary browser profile is removed after the scenario, clearing session credentials and cookies. Cucumber writes an HTML report to `test/e2etest/report.html`, which is ignored by Git.
 

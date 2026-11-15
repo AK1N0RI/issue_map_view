@@ -1,5 +1,5 @@
 const ISSUE_TYPES = {
-  ANALYSIS_RESULT: 'analysis_result',
+  FAILURE_ANALYSIS: 'failure_analysis',
   COUNTERMEASURE: 'countermeasure',
 };
 
@@ -51,16 +51,16 @@ async function openIssueList(type) {
   });
 }
 
-document.getElementById('new-analysis-result').addEventListener('click', () => {
-  openIssueCreate(ISSUE_TYPES.ANALYSIS_RESULT);
+document.getElementById('new-failure-analysis').addEventListener('click', () => {
+  openIssueCreate(ISSUE_TYPES.FAILURE_ANALYSIS);
 });
 
 document.getElementById('new-countermeasure').addEventListener('click', () => {
   openIssueCreate(ISSUE_TYPES.COUNTERMEASURE);
 });
 
-document.getElementById('link-analysis-result').addEventListener('click', () => {
-  openIssueList(ISSUE_TYPES.ANALYSIS_RESULT);
+document.getElementById('link-failure-analysis').addEventListener('click', () => {
+  openIssueList(ISSUE_TYPES.FAILURE_ANALYSIS);
 });
 
 document.getElementById('link-countermeasure').addEventListener('click', () => {

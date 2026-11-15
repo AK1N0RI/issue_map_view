@@ -1,5 +1,5 @@
 const ISSUE_MAP_TYPES = {
-  ANALYSIS_RESULT: 'analysis_result',
+  FAILURE_ANALYSIS: 'failure_analysis',
   COUNTERMEASURE: 'countermeasure',
 };
 
@@ -29,16 +29,18 @@ function getRepositoryContext() {
 }
 
 function buildIssueCreateUrl({ owner, repo, type }) {
-  const label = type === ISSUE_MAP_TYPES.COUNTERMEASURE ? 'countermeasure' : 'analysis_result';
+  const label = type === ISSUE_MAP_TYPES.COUNTERMEASURE ? 'countermeasure' : 'failure_analysis';
   const url = new URL(`https://github.com/${owner}/${repo}/issues/new`);
   url.searchParams.set('labels', label);
   return url.toString();
 }
 
 function buildIssueListUrl({ owner, repo, type }) {
-  const label = type === ISSUE_MAP_TYPES.COUNTERMEASURE ? 'countermeasure' : 'analysis_result';
+  const labelQuery = type === ISSUE_MAP_TYPES.COUNTERMEASURE
+    ? 'label:"countermeasure"'
+    : 'label:failure_analysis,analysis_result';
   const url = new URL(`https://github.com/${owner}/${repo}/issues`);
-  url.searchParams.set('q', `label:"${label}"`);
+  url.searchParams.set('q', labelQuery);
   return url.toString();
 }
 
@@ -127,7 +129,7 @@ function renderIssueCreateForm(content, utilities, repoContext, type, relatedAna
   const defaultBody = new URL(utilities.buildIssueCreateUrl({ ...repoContext, type }))
     .searchParams.get('body') || '';
   bodyInput.value = type === ISSUE_MAP_TYPES.COUNTERMEASURE && relatedAnalysisIssue
-    ? utilities.addAnalysisIssueReference(defaultBody, relatedAnalysisIssue.number)
+    ? utilities.addFailureAnalysisIssueReference(defaultBody, relatedAnalysisIssue.number)
     : defaultBody;
   bodyLabel.appendChild(bodyInput);
 
@@ -167,13 +169,13 @@ async function openIssueCreateDrawer(type, relatedAnalysisIssue = null) {
   const drawer = document.createElement('section');
   drawer.setAttribute('role', 'dialog');
   drawer.setAttribute('aria-modal', 'true');
-  drawer.setAttribute('aria-label', type === ISSUE_MAP_TYPES.COUNTERMEASURE ? 'Create a countermeasure' : 'Create an analysis result');
+  drawer.setAttribute('aria-label', type === ISSUE_MAP_TYPES.COUNTERMEASURE ? 'Create a countermeasure' : 'Create a failure analysis');
   drawer.style.cssText = 'display: flex; flex-direction: column; width: min(640px, 100vw); height: 100%; overflow: hidden; color: var(--fgColor-default, #1f2328); background: var(--bgColor-default, #fff); box-shadow: -8px 0 24px rgba(31, 35, 40, 0.2);';
 
   const header = document.createElement('header');
   header.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--borderColor-default, #d1d9e0);';
   const title = document.createElement('h2');
-  title.textContent = type === ISSUE_MAP_TYPES.COUNTERMEASURE ? 'Create a countermeasure' : 'Create an analysis result';
+  title.textContent = type === ISSUE_MAP_TYPES.COUNTERMEASURE ? 'Create a countermeasure' : 'Create a failure analysis';
   title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 600;';
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
@@ -218,7 +220,7 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
   const drawer = document.createElement('section');
   drawer.setAttribute('role', 'dialog');
   drawer.setAttribute('aria-modal', 'true');
-  drawer.setAttribute('aria-label', 'Link countermeasures to an analysis result');
+  drawer.setAttribute('aria-label', 'Link countermeasures to a failure analysis');
   drawer.style.cssText = 'display: flex; flex-direction: column; width: min(640px, 100vw); height: 100%; overflow: hidden; color: var(--fgColor-default, #1f2328); background: var(--bgColor-default, #fff); box-shadow: -8px 0 24px rgba(31, 35, 40, 0.2);';
 
   const header = document.createElement('header');
@@ -269,15 +271,15 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
     const form = document.createElement('form');
     form.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
     const analysisLabel = document.createElement('label');
-    analysisLabel.textContent = 'Analysis result to link';
+    analysisLabel.textContent = 'Failure Analysis to link';
     analysisLabel.style.cssText = 'display: flex; flex-direction: column; gap: 4px; font-weight: 600;';
     const analysisSelect = document.createElement('select');
     analysisSelect.className = 'form-control';
-    analysisSelect.setAttribute('aria-label', 'Analysis result to link');
+    analysisSelect.setAttribute('aria-label', 'Failure Analysis to link');
     if (analysisIssues.length === 0) {
       const emptyAnalysisOption = document.createElement('option');
       emptyAnalysisOption.value = '';
-      emptyAnalysisOption.textContent = 'No analysis results available';
+      emptyAnalysisOption.textContent = 'No failure analyses available';
       emptyAnalysisOption.selected = true;
       analysisSelect.appendChild(emptyAnalysisOption);
       analysisSelect.disabled = true;
@@ -329,7 +331,7 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
         const issueTitle = document.createElement('span');
         issueTitle.textContent = `#${issue.number} ${issue.title}`;
         issueTitle.style.fontWeight = '600';
-        const currentReferences = utilities.getAnalysisIssueNumbers(issue.body)
+        const currentReferences = utilities.getFailureAnalysisIssueNumbers(issue.body)
           .map((number) => `#${number}`).join(', ');
         const existingLinks = document.createElement('small');
         existingLinks.className = 'color-fg-muted';
@@ -351,7 +353,7 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
         return;
       }
       if (!analysisSelect.value) {
-        status.textContent = 'Select an analysis result to link.';
+        status.textContent = 'Select a failure analysis to link.';
         return;
       }
       linkButton.disabled = true;
@@ -366,7 +368,7 @@ async function openIssueLinkDrawer(repoContext, relatedAnalysisIssue = null) {
         if (!response?.ok) {
           throw new Error(response?.error || 'Could not save the issue links');
         }
-        status.textContent = `Linked countermeasure #${response.linkedIssueNumbers.join(', #')} to analysis result #${response.analysisIssueNumber}.`;
+        status.textContent = `Linked countermeasure #${response.linkedIssueNumbers.join(', #')} to failure analysis #${response.analysisIssueNumber}.`;
         issueMapPageState?.page.loadIssues();
       } catch (error) {
         status.textContent = `Could not link the issues: ${error.message}`;
@@ -509,7 +511,7 @@ async function openPullRequestLinkDrawer(
     };
 
     const analysisList = createIssueCheckboxList(
-      'Analysis Results',
+      'Failure Analyses',
       analysisIssues,
       'analysisIssue',
       relatedAnalysisIssue
@@ -531,7 +533,7 @@ async function openPullRequestLinkDrawer(
     linkButton.disabled = analysisIssues.length === 0 || countermeasureIssues.length === 0;
     const helperText = document.createElement('p');
     helperText.className = 'text-small color-fg-muted';
-    helperText.textContent = 'The pull request description records selected issues as "Related to analysis result #<number>" or "Related to countermeasure #<number>". Existing references are preserved and cannot be removed here.';
+    helperText.textContent = 'The pull request description records selected issues as "Related to failure analysis #<number>" or "Related to countermeasure #<number>". Existing references are preserved and cannot be removed here.';
     form.append(
       pullRequestLabel,
       analysisList.fieldset,
@@ -570,7 +572,7 @@ async function openPullRequestLinkDrawer(
         .filter((input) => input.checked)
         .map((input) => Number(input.value));
       if (analysisIssueNumbers.length === 0 || countermeasureIssueNumbers.length === 0) {
-        status.textContent = 'Select at least one analysis result and one countermeasure.';
+        status.textContent = 'Select at least one failure analysis and one countermeasure.';
         return;
       }
       linkButton.disabled = true;
@@ -580,13 +582,13 @@ async function openPullRequestLinkDrawer(
           type: 'LINK_PULL_REQUEST_ISSUES',
           ...repoContext,
           pullRequestNumber: Number(pullRequestSelect.value),
-          analysisIssueNumbers,
+          failureAnalysisIssueNumbers: analysisIssueNumbers,
           countermeasureIssueNumbers,
         });
         if (!response?.ok) {
           throw new Error(response?.error || 'Could not save pull request links');
         }
-        status.textContent = `Linked pull request #${response.pullRequestNumber} to ${response.linkedAnalysisIssueNumbers.length} analysis result(s) and ${response.linkedCountermeasureIssueNumbers.length} countermeasure(s).`;
+        status.textContent = `Linked pull request #${response.pullRequestNumber} to ${response.linkedFailureAnalysisIssueNumbers.length} failure analysis issue(s) and ${response.linkedCountermeasureIssueNumbers.length} countermeasure(s).`;
         issueMapPageState?.page.updatePullRequest(response.pullRequest);
       } catch (error) {
         status.textContent = `Could not link the pull request: ${error.message}`;
@@ -1018,7 +1020,7 @@ function createIssueMapPage() {
   heading.style.cssText = 'font-size: 16px; font-weight: 600; line-height: 1.25; margin: 0 0 16px;';
 
   const warning = document.createElement('p');
-  warning.textContent = 'Warning: Countermeasures and PRs are expected to have a 1:1 relationship. A PR linked to multiple Countermeasures is repeated for each Analysis Result–Countermeasure combination.';
+  warning.textContent = 'Warning: Countermeasures and PRs are expected to have a 1:1 relationship. A PR linked to multiple Countermeasures is repeated for each Failure Analysis–Countermeasure combination.';
   warning.hidden = true;
   warning.setAttribute('role', 'note');
   warning.style.cssText = 'margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--borderColor-attention-emphasis, #bf8700); border-radius: 6px; color: var(--fgColor-attention, #9a6700); background: var(--bgColor-attention-muted, #fff8c5);';
@@ -1085,7 +1087,7 @@ function createIssueMapPage() {
   analysisNumberHeader.textContent = 'Number';
   analysisNumberHeader.rowSpan = 2;
   const analysisHeader = document.createElement('th');
-  analysisHeader.textContent = 'Analysis Result';
+  analysisHeader.textContent = 'Failure Analysis';
   analysisHeader.colSpan = 9;
   const countermeasureNumberHeader = document.createElement('th');
   countermeasureNumberHeader.textContent = 'Number';
@@ -1174,7 +1176,7 @@ function createIssueMapPage() {
       row.appendChild(cell);
     };
     appendNumberCell();
-    appendEmptyCategoryCell('No analysis results.', ISSUE_MAP_TYPES.ANALYSIS_RESULT, 9);
+    appendEmptyCategoryCell('No failure analyses.', ISSUE_MAP_TYPES.FAILURE_ANALYSIS, 9);
     appendNumberCell();
     appendEmptyCategoryCell('No countermeasures.', ISSUE_MAP_TYPES.COUNTERMEASURE, 5);
     const pullRequestCell = document.createElement('td');
@@ -1199,7 +1201,7 @@ function createIssueMapPage() {
   const showCreateActions = () => {
     createActions.replaceChildren();
     for (const [label, type] of [
-      ['Create analysis result', ISSUE_MAP_TYPES.ANALYSIS_RESULT],
+      ['Create failure analysis', ISSUE_MAP_TYPES.FAILURE_ANALYSIS],
       ['Create countermeasure', ISSUE_MAP_TYPES.COUNTERMEASURE],
     ]) {
       const button = document.createElement('a');
@@ -1223,7 +1225,7 @@ function createIssueMapPage() {
 
   const createEmptyCategoryCell = (type, message, utilities, relatedAnalysisIssue = null) => {
     const cell = document.createElement('td');
-    cell.colSpan = type === ISSUE_MAP_TYPES.ANALYSIS_RESULT ? 9 : 5;
+    cell.colSpan = type === ISSUE_MAP_TYPES.FAILURE_ANALYSIS ? 9 : 5;
     cell.style.cssText = 'padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); vertical-align: top;';
     const text = document.createElement('div');
     text.textContent = message;
@@ -1304,15 +1306,15 @@ function createIssueMapPage() {
       } else {
         if (analysisIssue) {
           row.appendChild(createEmptyCategoryCell(
-            ISSUE_MAP_TYPES.ANALYSIS_RESULT,
-            'No analysis result is linked.',
+            ISSUE_MAP_TYPES.FAILURE_ANALYSIS,
+            'No failure analysis is linked.',
             utilities
           ));
         } else {
           const emptyAnalysisCell = document.createElement('td');
           emptyAnalysisCell.colSpan = 9;
           emptyAnalysisCell.style.cssText = 'padding: 8px; border: 1px solid var(--borderColor-default, #d1d9e0); color: var(--fgColor-muted, #656d76); vertical-align: top;';
-          emptyAnalysisCell.textContent = 'No linked analysis result.';
+          emptyAnalysisCell.textContent = 'No linked failure analysis.';
           row.appendChild(emptyAnalysisCell);
         }
       }
@@ -1395,7 +1397,7 @@ function createIssueMapPage() {
       const { analysisIssues: rawAnalysisIssues, countermeasureIssues: rawCountermeasureIssues } = issueData;
       const pullRequests = pullRequestsResult.pullRequests || [];
       const analysisIssues = rawAnalysisIssues.map((issue) => {
-        const parsed = utilities.parseAnalysisResult(issue.body || '');
+        const parsed = utilities.parseFailureAnalysis(issue.body || '');
         return {
           ...issue,
           parsed: { ...parsed, failureMode: parsed.failureMode || issue.title },
@@ -1419,7 +1421,7 @@ function createIssueMapPage() {
       }
       statusMessage.textContent = pullRequestsResult.error
         ? `Could not refresh pull requests: ${pullRequestsResult.error.message}`
-        : `${analysisIssues.length} analysis results, ${countermeasureIssues.length} countermeasures, ${pullRequests.length} pull requests`;
+        : `${analysisIssues.length} failure analyses, ${countermeasureIssues.length} countermeasures, ${pullRequests.length} pull requests`;
     } catch (error) {
       statusMessage.textContent = `Could not load issues: ${error.message}`;
       const errorRow = document.createElement('tr');
@@ -1449,7 +1451,7 @@ function createIssueMapPage() {
       currentPullRequests,
       currentUtilities
     );
-    statusMessage.textContent = `${currentAnalysisIssues.length} analysis results, ${currentCountermeasureIssues.length} countermeasures, ${currentPullRequests.length} pull requests`;
+    statusMessage.textContent = `${currentAnalysisIssues.length} failure analyses, ${currentCountermeasureIssues.length} countermeasures, ${currentPullRequests.length} pull requests`;
   };
   wrapper.updateIssue = (issue) => {
     if (!currentUtilities || !issue || !Number.isInteger(issue.number)) {
@@ -1462,8 +1464,8 @@ function createIssueMapPage() {
     const analysisIssues = currentAnalysisIssues.filter((item) => item.number !== issue.number);
     const countermeasureIssues = currentCountermeasureIssues
       .filter((item) => item.number !== issue.number);
-    if (hasLabel(ISSUE_MAP_TYPES.ANALYSIS_RESULT)) {
-      const parsed = currentUtilities.parseAnalysisResult(issue.body || '');
+    if (hasLabel(ISSUE_MAP_TYPES.FAILURE_ANALYSIS) || hasLabel('analysis_result')) {
+      const parsed = currentUtilities.parseFailureAnalysis(issue.body || '');
       analysisIssues.push({
         ...issue,
         parsed: { ...parsed, failureMode: parsed.failureMode || issue.title },
@@ -1488,7 +1490,7 @@ function createIssueMapPage() {
         currentUtilities
       );
     }
-    statusMessage.textContent = `${currentAnalysisIssues.length} analysis results, ${currentCountermeasureIssues.length} countermeasures, ${currentPullRequests.length} pull requests`;
+    statusMessage.textContent = `${currentAnalysisIssues.length} failure analyses, ${currentCountermeasureIssues.length} countermeasures, ${currentPullRequests.length} pull requests`;
   };
   wrapper.append(heading, warning, toolbar, tableWrapper);
   wrapper.loadIssues = loadIssues;

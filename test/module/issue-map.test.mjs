@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  parseAnalysisResult,
+  parseFailureAnalysis,
   parseCountermeasure,
   buildIssueCreateUrl,
   buildIssueCreateApiRequest,
-  addAnalysisIssueReference,
-  getAnalysisIssueNumbers,
-  updateAnalysisIssueReferences,
-  groupCountermeasuresByAnalysis,
+  addFailureAnalysisIssueReference,
+  getFailureAnalysisIssueNumbers,
+  updateFailureAnalysisIssueReferences,
+  groupCountermeasuresByFailureAnalysis,
   buildIssueListUrl,
   buildPullRequestCreateUrl,
   getPullRequestIssueNumbers,
@@ -17,9 +17,9 @@ import {
   buildIssueMapRows,
 } from '../../src/lib/issue-map.js';
 
-test('parseAnalysisResult extracts structured fields from markdown', () => {
+test('parseFailureAnalysis extracts structured fields from markdown', () => {
   const markdown = `
-### analysis result
+### failure analysis
 * Failure Mode: the motor does not start
 * Failure Cause: a component is damaged
 * Failure Classification: mechanical failure
@@ -31,7 +31,7 @@ test('parseAnalysisResult extracts structured fields from markdown', () => {
 * Detection: 3
 `;
 
-  const result = parseAnalysisResult(markdown);
+  const result = parseFailureAnalysis(markdown);
 
   assert.equal(result.failureMode, 'the motor does not start');
   assert.equal(result.failureCause, 'a component is damaged');
@@ -44,10 +44,10 @@ test('parseAnalysisResult extracts structured fields from markdown', () => {
   assert.equal(result.detection, 3);
 });
 
-test('parseAnalysisResult ignores bullets outside its section and leaves missing scores blank', () => {
-  const result = parseAnalysisResult(`
+test('parseFailureAnalysis ignores bullets outside its section and leaves missing scores blank', () => {
+  const result = parseFailureAnalysis(`
 * Failure Mode: unrelated section
-### analysis result
+### failure analysis
 * Failure Mode: issue title details
 * Failure Cause: worn bearing
 ### notes
@@ -59,8 +59,8 @@ test('parseAnalysisResult ignores bullets outside its section and leaves missing
   assert.equal(result.severity, '');
 });
 
-test('parseAnalysisResult reads fields without a heading and accepts markdown formatting', () => {
-  const result = parseAnalysisResult(`
+test('parseFailureAnalysis reads fields without a heading and accepts markdown formatting', () => {
+  const result = parseFailureAnalysis(`
 - **Failure Mode**: motor does not start
 | Failure Cause | worn bearing |
 | **Severity** | 9 |
@@ -71,9 +71,9 @@ test('parseAnalysisResult reads fields without a heading and accepts markdown fo
   assert.equal(result.severity, 9);
 });
 
-test('parseAnalysisResult reads the English fields from the creation template', () => {
-  const result = parseAnalysisResult(`
-### analysis result
+test('parseFailureAnalysis reads the English fields from the creation template', () => {
+  const result = parseFailureAnalysis(`
+### failure analysis
 <!-- do not edit predefined fields -->
 * Failure Mode: motor does not start
 * Failure Cause: worn bearing
@@ -97,6 +97,14 @@ test('parseAnalysisResult reads the English fields from the creation template', 
     occurrence: 7,
     detection: 3,
   });
+});
+
+test('parseFailureAnalysis continues to read issues with the legacy heading', () => {
+  const result = parseFailureAnalysis(
+    '### analysis result\n* Failure Mode: legacy content\n### Notes\n* Failure Mode: unrelated'
+  );
+
+  assert.equal(result.failureMode, 'legacy content');
 });
 
 test('parseCountermeasure extracts measure data from markdown', () => {
@@ -157,17 +165,27 @@ test('parseCountermeasure reads markdown fields without a section heading', () =
   assert.equal(result.rpn, 18);
 });
 
-test('buildIssueCreateUrl adds the analysis_result label for issue creation', () => {
+test('buildIssueCreateUrl adds the failure_analysis label for issue creation', () => {
   const url = buildIssueCreateUrl({
     owner: 'octo-org',
     repo: 'demo-repo',
-    type: 'analysis_result',
+    type: 'failure_analysis',
+  });
+
+  test('buildIssueCreateUrl maps the legacy issue type to the failure_analysis label', () => {
+    const url = new URL(buildIssueCreateUrl({
+      owner: 'octo-org',
+      repo: 'demo-repo',
+      type: 'analysis_result',
+    }));
+
+    assert.equal(url.searchParams.get('labels'), 'failure_analysis');
   });
 
   const parsedUrl = new URL(url);
   assert.equal(parsedUrl.origin + parsedUrl.pathname, 'https://github.com/octo-org/demo-repo/issues/new');
-  assert.equal(parsedUrl.searchParams.get('labels'), 'analysis_result');
-  assert.equal(parsedUrl.searchParams.get('body'), `### analysis result
+  assert.equal(parsedUrl.searchParams.get('labels'), 'failure_analysis');
+  assert.equal(parsedUrl.searchParams.get('body'), `### failure analysis
 <!-- do not edit predefined fields -->
 * Failure Mode: <!-- insert failure mode -->
 * Failure Cause: <!-- insert failure cause -->
@@ -202,30 +220,30 @@ test('buildIssueCreateUrl includes a supplied title and body', () => {
 const url = new URL(buildIssueCreateUrl({
   owner: 'octo-org',
   repo: 'demo-repo',
-  type: 'analysis_result',
+  type: 'failure_analysis',
   title: 'Motor failure',
-  body: '### analysis result\n* Failure Mode: Motor does not start',
+  body: '### failure analysis\n* Failure Mode: Motor does not start',
 }));
 
-assert.equal(url.searchParams.get('labels'), 'analysis_result');
+assert.equal(url.searchParams.get('labels'), 'failure_analysis');
 assert.equal(url.searchParams.get('title'), 'Motor failure');
-assert.equal(url.searchParams.get('body'), '### analysis result\n* Failure Mode: Motor does not start');
+assert.equal(url.searchParams.get('body'), '### failure analysis\n* Failure Mode: Motor does not start');
 });
 
-test('buildIssueCreateApiRequest sends analysis results to the GitHub Issues API', () => {
+test('buildIssueCreateApiRequest sends failure analyses to the GitHub Issues API', () => {
   assert.deepEqual(buildIssueCreateApiRequest({
     owner: 'octo-org',
     repo: 'demo-repo',
-    type: 'analysis_result',
+    type: 'failure_analysis',
     title: '  Motor failure  ',
-    body: '### analysis result',
+    body: '### failure analysis',
   }), {
     url: 'https://api.github.com/repos/octo-org/demo-repo/issues',
     method: 'POST',
     payload: {
       title: 'Motor failure',
-      body: '### analysis result',
-      labels: ['analysis_result'],
+      body: '### failure analysis',
+      labels: ['failure_analysis'],
     },
   });
 });
@@ -242,41 +260,52 @@ test('buildIssueCreateApiRequest applies the countermeasure label', () => {
   assert.deepEqual(request.payload.labels, ['countermeasure']);
 });
 
-test('addAnalysisIssueReference adds the related analysis issue to a countermeasure body', () => {
+test('addFailureAnalysisIssueReference adds the related analysis issue to a countermeasure body', () => {
   assert.equal(
-    addAnalysisIssueReference('### countermeasure\n* Content: replace bearing\n', 42),
-    '### countermeasure\n* Content: replace bearing\n\nRelated analysis result: #42'
+    addFailureAnalysisIssueReference('### countermeasure\n* Content: replace bearing\n', 42),
+    '### countermeasure\n* Content: replace bearing\n\nRelated failure analysis: #42'
   );
 });
 
-test('addAnalysisIssueReference leaves unassociated countermeasure bodies unchanged', () => {
+test('addFailureAnalysisIssueReference leaves unassociated countermeasure bodies unchanged', () => {
   const body = '### countermeasure\n* Content: replace bearing';
-  assert.equal(addAnalysisIssueReference(body, null), body);
+  assert.equal(addFailureAnalysisIssueReference(body, null), body);
 });
 
-test('updateAnalysisIssueReferences appends links once and writes issue numbers in ascending order', () => {
+test('updateFailureAnalysisIssueReferences appends links once and writes issue numbers in ascending order', () => {
   assert.equal(
-    updateAnalysisIssueReferences(
-      '### countermeasure\n* Content: replace bearing\n\nRelated analysis result: #4; #2',
+    updateFailureAnalysisIssueReferences(
+      '### countermeasure\n* Content: replace bearing\n\nRelated failure analysis: #4; #2',
       [8, 2]
     ),
-    '### countermeasure\n* Content: replace bearing\n\nRelated analysis result: #2, #4, #8'
+    '### countermeasure\n* Content: replace bearing\n\nRelated failure analysis: #2, #4, #8'
   );
   assert.deepEqual(
-    getAnalysisIssueNumbers('Related analysis result: #2, #4; #8'),
+    getFailureAnalysisIssueNumbers('Related failure analysis: #2, #4; #8'),
     [2, 4, 8]
   );
 });
 
-test('groupCountermeasuresByAnalysis maps one analysis issue to multiple countermeasures', () => {
+test('failure analysis references remain readable when stored in the legacy format', () => {
+  assert.deepEqual(
+    getFailureAnalysisIssueNumbers('Related analysis result: #4, #2'),
+    [4, 2]
+  );
+  assert.equal(
+    updateFailureAnalysisIssueReferences('### countermeasure\nRelated analysis result: #4', [2]),
+    '### countermeasure\n\nRelated failure analysis: #2, #4'
+  );
+});
+
+test('groupCountermeasuresByFailureAnalysis maps one analysis issue to multiple countermeasures', () => {
   const analysisIssues = [{ number: 12 }, { number: 34 }];
   const countermeasureIssues = [
-    { number: 101, body: '### countermeasure\n* Related analysis result: #12' },
-    { number: 102, body: '### countermeasure\nRelated analysis result: #12' },
-    { number: 103, body: '### countermeasure\nRelated analysis result: #34' },
+    { number: 101, body: '### countermeasure\n* Related failure analysis: #12' },
+    { number: 102, body: '### countermeasure\nRelated failure analysis: #12' },
+    { number: 103, body: '### countermeasure\nRelated failure analysis: #34' },
   ];
 
-  const result = groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues);
+  const result = groupCountermeasuresByFailureAnalysis(analysisIssues, countermeasureIssues);
 
   assert.deepEqual(result.groups.map(({ analysisIssue, countermeasureIssues: linked }) => [
     analysisIssue.number,
@@ -288,15 +317,15 @@ test('groupCountermeasuresByAnalysis maps one analysis issue to multiple counter
   assert.deepEqual(result.unlinkedCountermeasures, []);
 });
 
-test('groupCountermeasuresByAnalysis keeps missing and unknown references separate', () => {
+test('groupCountermeasuresByFailureAnalysis keeps missing and unknown references separate', () => {
   const analysisIssues = [{ number: 12 }];
   const countermeasureIssues = [
-    { number: 101, body: '### countermeasure\nRelated analysis result: #12' },
-    { number: 102, body: '### countermeasure\nRelated analysis result: #99' },
+    { number: 101, body: '### countermeasure\nRelated failure analysis: #12' },
+    { number: 102, body: '### countermeasure\nRelated failure analysis: #99' },
     { number: 103, body: '### countermeasure' },
   ];
 
-  const result = groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues);
+  const result = groupCountermeasuresByFailureAnalysis(analysisIssues, countermeasureIssues);
 
   assert.deepEqual(result.groups.map(({ analysisIssue, countermeasureIssues: linked }) => [
     analysisIssue.number,
@@ -305,17 +334,17 @@ test('groupCountermeasuresByAnalysis keeps missing and unknown references separa
   assert.deepEqual(result.unlinkedCountermeasures.map((issue) => issue.number), [102, 103]);
 });
 
-test('groupCountermeasuresByAnalysis links one countermeasure to every referenced analysis issue', () => {
+test('groupCountermeasuresByFailureAnalysis links one countermeasure to every referenced analysis issue', () => {
   const analysisIssues = [{ number: 2 }, { number: 4 }, { number: 6 }, { number: 8 }];
   const countermeasureIssues = [
-    { number: 101, body: 'Related analysis result: #2, #4' },
-    { number: 102, body: 'Related analysis result: #2; #6' },
-    { number: 103, body: 'Related analysis result: #4 #8' },
-    { number: 104, body: 'Related analysis result: #2 - #8' },
-    { number: 105, body: 'Related analysis result: #2, #2, #4' },
+    { number: 101, body: 'Related failure analysis: #2, #4' },
+    { number: 102, body: 'Related failure analysis: #2; #6' },
+    { number: 103, body: 'Related failure analysis: #4 #8' },
+    { number: 104, body: 'Related failure analysis: #2 - #8' },
+    { number: 105, body: 'Related failure analysis: #2, #2, #4' },
   ];
 
-  const result = groupCountermeasuresByAnalysis(analysisIssues, countermeasureIssues);
+  const result = groupCountermeasuresByFailureAnalysis(analysisIssues, countermeasureIssues);
 
   assert.deepEqual(result.groups.map(({ analysisIssue, countermeasureIssues: linked }) => [
     analysisIssue.number,
@@ -342,6 +371,16 @@ test('buildIssueListUrl filters the repository issues by label', () => {
   );
 });
 
+test('buildIssueListUrl includes legacy Failure Analysis labels for existing issues', () => {
+  const url = new URL(buildIssueListUrl({
+    owner: 'octo-org',
+    repo: 'demo-repo',
+    type: 'failure_analysis',
+  }));
+
+  assert.equal(url.searchParams.get('q'), 'label:failure_analysis,analysis_result');
+});
+
 test('buildPullRequestCreateUrl opens the repository compare page', () => {
   assert.equal(buildPullRequestCreateUrl({ owner: 'octo-org', repo: 'demo-repo' }),
     'https://github.com/octo-org/demo-repo/compare');
@@ -354,14 +393,14 @@ test('pull request issue references are deduplicated and can be added without re
   );
   assert.equal(
     addPullRequestIssueReferences('Closes #2', {
-      analysisIssueNumbers: [2, 4, 4],
+      failureAnalysisIssueNumbers: [2, 4, 4],
       countermeasureIssueNumbers: [10],
     }),
     'Closes #2\n\n<!-- Issue Map relationship guidance\n'
-      + '"Related to analysis result #<number>" links an Analysis Result.\n'
+      + '"Related to failure analysis #<number>" links a Failure Analysis.\n'
       + '"Related to countermeasure #<number>" links a Countermeasure.\n'
       + 'Add one reference per line. This optional note can be removed.\n'
-      + '-->\nRelated to analysis result #2\nRelated to analysis result #4\n'
+      + '-->\nRelated to failure analysis #2\nRelated to failure analysis #4\n'
       + 'Related to countermeasure #10'
   );
   assert.deepEqual(
@@ -392,10 +431,10 @@ test('pull request issue references are deduplicated and can be added without re
     [2, 10]
   );
   const withGuidance = addPullRequestIssueReferences('', {
-    analysisIssueNumbers: [2],
+    failureAnalysisIssueNumbers: [2],
     countermeasureIssueNumbers: [10],
   });
-  assert.match(withGuidance, /Analysis Result/);
+  assert.match(withGuidance, /Failure Analysis/);
   assert.match(withGuidance, /Countermeasure/);
   assert.match(withGuidance, /This optional note can be removed/);
   assert.deepEqual(getPullRequestIssueNumbers(withGuidance), [2, 10]);
@@ -403,48 +442,59 @@ test('pull request issue references are deduplicated and can be added without re
     getPullRequestIssueNumbers(withGuidance.replace(/<!--[\s\S]*?-->\n?/, '')),
     [2, 10]
   );
+  assert.deepEqual(
+    getPullRequestIssueNumbers('Related to analysis result #2\nRelated to failure analysis #3'),
+    [2, 3]
+  );
+  assert.doesNotMatch(
+    addPullRequestIssueReferences('Related to analysis result #2', {
+      failureAnalysisIssueNumbers: [2],
+      countermeasureIssueNumbers: [],
+    }),
+    /Related to failure analysis #2/
+  );
   assert.match(
     addPullRequestIssueReferences('Related to #2\nRelated to #10', {
-      analysisIssueNumbers: [2],
+      failureAnalysisIssueNumbers: [2],
       countermeasureIssueNumbers: [10],
     }),
     /<!-- Issue Map relationship guidance/
   );
   assert.equal(
     addPullRequestIssueReferences(withGuidance, {
-      analysisIssueNumbers: [2],
+      failureAnalysisIssueNumbers: [2],
       countermeasureIssueNumbers: [10],
     }),
     withGuidance
   );
   assert.equal(
     addPullRequestIssueReferences('Related to other/repo#2', {
-      analysisIssueNumbers: [2],
+      failureAnalysisIssueNumbers: [2],
       countermeasureIssueNumbers: [],
     }, {
       owner: 'octo-org',
       repo: 'demo',
     }),
     'Related to other/repo#2\n\n<!-- Issue Map relationship guidance\n'
-      + '"Related to analysis result #<number>" links an Analysis Result.\n'
+      + '"Related to failure analysis #<number>" links a Failure Analysis.\n'
       + '"Related to countermeasure #<number>" links a Countermeasure.\n'
       + 'Add one reference per line. This optional note can be removed.\n'
-      + '-->\nRelated to analysis result #2'
+      + '-->\nRelated to failure analysis #2'
   );
   assert.equal(
     addPullRequestIssueReferences('Related to #2\nRelated to #10', {
-      analysisIssueNumbers: [2],
+      failureAnalysisIssueNumbers: [2],
       countermeasureIssueNumbers: [10],
     }),
     'Related to #2\nRelated to #10\n\n<!-- Issue Map relationship guidance\n'
-      + '"Related to analysis result #<number>" links an Analysis Result.\n'
+      + '"Related to failure analysis #<number>" links a Failure Analysis.\n'
       + '"Related to countermeasure #<number>" links a Countermeasure.\n'
       + 'Add one reference per line. This optional note can be removed.\n'
-      + '-->\nRelated to analysis result #2\nRelated to countermeasure #10'
+      + '-->\nRelated to failure analysis #2\nRelated to countermeasure #10'
   );
   assert.throws(
     () => addPullRequestIssueReferences('', {
-      analysisIssueNumbers: [0],
+      failureAnalysisIssueNumbers: [0],
       countermeasureIssueNumbers: [],
     }),
     /references are invalid/
@@ -454,7 +504,7 @@ test('pull request issue references are deduplicated and can be added without re
 test('buildIssueMapRows expands PR links into one row per analysis-countermeasure-PR combination', () => {
   const analysisIssues = [{ number: 2 }, { number: 4 }, { number: 6 }];
   const countermeasureIssues = [
-    { number: 10, body: 'Related analysis result: #2' },
+    { number: 10, body: 'Related failure analysis: #2' },
     { number: 11, body: '' },
     { number: 12, body: '' },
   ];
