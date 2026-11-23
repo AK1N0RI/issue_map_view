@@ -5,8 +5,6 @@
   "description": "GitHub issue-based FMEA and countermeasure visualization tool.",
   "permissions": [
     "storage",
-    "activeTab",
-    "scripting",
     "tabs"
   ],
   "host_permissions": [

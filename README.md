@@ -5,6 +5,8 @@
 
 **See the full FMEA story in one place.** Issue Map View is a Chrome extension that turns Failure Analysis issues, Countermeasures, and pull requests into a live, spreadsheet-like map on GitHub repository pages. Follow how a failure connects to its corrective action and implementation PR—without manually piecing together separate issues.
 
+[Privacy policy](./PRIVACY.md)
+
 ![Issue Map showing Failure Analyses, Countermeasures, and linked pull requests in a GitHub repository](./img/issues_map.png)
 
 ## Why Issue Map?
